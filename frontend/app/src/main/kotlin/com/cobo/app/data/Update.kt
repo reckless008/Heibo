@@ -71,12 +71,12 @@ data class UpdateInfo(
  */
 object Updater {
     /**
-     * 更新模块总开关。原发布源是原作者的 Costben/COBO Releases，与 Heibo 无关，已停用；
-     * 后续把 [ReleasesUrl] 换成 Heibo 自己的发布源后改为 true 即恢复（下载 / 安装 / 弹窗框架均保留）。
+     * 更新模块总开关。发布源为 Heibo 自己的 GitHub Releases；
+     * 若改用其他更新源（如静态 JSON 托管），换 [ReleasesUrl] 即可。
      */
-    val UpdatesEnabled = false
+    val UpdatesEnabled = true
 
-    private const val ReleasesUrl = "https://api.github.com/repos/Costben/COBO/releases?per_page=20"
+    private const val ReleasesUrl = "https://api.github.com/repos/reckless008/Heibo/releases?per_page=20"
 
     // 更新检查和微博是两套身份：绝不能把微博 Cookie / UA 带给 GitHub。
     private val client = OkHttpClient.Builder()
