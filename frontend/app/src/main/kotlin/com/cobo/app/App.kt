@@ -98,6 +98,10 @@ object App {
      * 自动检查只在真的查到新版本时挂上 [pendingUpdate]。
      */
     suspend fun checkUpdate(manual: Boolean): UpdateInfo? {
+        if (!Updater.UpdatesEnabled) {
+            if (manual) toast("更新检查已停用，待接入 Heibo 自己的更新源")
+            return null
+        }
         if (checkingUpdate) {
             if (manual) toast("正在检查更新…")
             return pendingUpdate

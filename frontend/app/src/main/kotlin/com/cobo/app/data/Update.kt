@@ -70,6 +70,12 @@ data class UpdateInfo(
  * pre-release，而本项目的日常版本全是 `-pre`，所以自己拉列表按版本号挑最大的一个。
  */
 object Updater {
+    /**
+     * 更新模块总开关。原发布源是原作者的 Costben/COBO Releases，与 Heibo 无关，已停用；
+     * 后续把 [ReleasesUrl] 换成 Heibo 自己的发布源后改为 true 即恢复（下载 / 安装 / 弹窗框架均保留）。
+     */
+    val UpdatesEnabled = false
+
     private const val ReleasesUrl = "https://api.github.com/repos/Costben/COBO/releases?per_page=20"
 
     // 更新检查和微博是两套身份：绝不能把微博 Cookie / UA 带给 GitHub。
@@ -96,6 +102,7 @@ object Updater {
         }
 
     private fun fetchReleases(): String {
+        if (!UpdatesEnabled) return "[]"
         val request = Request.Builder()
             .url(ReleasesUrl)
             .header("Accept", "application/vnd.github+json")
