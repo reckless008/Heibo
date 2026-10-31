@@ -345,10 +345,10 @@ fun CoboPredictiveBackHandler(nav: NavState) {
                 if (value < 0.98f) moved = true
                 lastProgress = value
                 // 只跟真手势的进度；按钮返回的瞬时终点不许把页面一帧拽走。
-                // 短 tween 追赶目标而不是硬拍：跟手带一点阻尼惯性，滑动才不生硬。
+                // 跟手必须 1:1 即时映射：任何补间都会让帧拖在手指后面，显得拖泥带水。
                 if (sawGesture) {
-                    entry.progress.animateTo(value, tween(70))
-                    if (entry.expand) entry.fade.animateTo(value, tween(70))
+                    entry.progress.snapTo(value)
+                    if (entry.expand) entry.fade.snapTo(value)
                 }
             }
             if (!sawGesture) {
