@@ -345,9 +345,10 @@ fun CoboPredictiveBackHandler(nav: NavState) {
                 if (value < 0.98f) moved = true
                 lastProgress = value
                 // 只跟真手势的进度；按钮返回的瞬时终点不许把页面一帧拽走。
+                // 短 tween 追赶目标而不是硬拍：跟手带一点阻尼惯性，滑动才不生硬。
                 if (sawGesture) {
-                    entry.progress.snapTo(value)
-                    if (entry.expand) entry.fade.snapTo(value)
+                    entry.progress.animateTo(value, tween(70))
+                    if (entry.expand) entry.fade.animateTo(value, tween(70))
                 }
             }
             if (!sawGesture) {
@@ -360,6 +361,8 @@ fun CoboPredictiveBackHandler(nav: NavState) {
             if (lastProgress <= 0.02f && moved) {
                 nav.completePredictivePop(entry)
             } else {
+                // 提前松手：关掉预览态再补完整退场，尾段不再被压缩。
+                entry.previewing = false
                 nav.pop()
             }
         } catch (cancelled: CancellationException) {
@@ -477,10 +480,9 @@ private fun ExpandLayer(
     // A gesture pulling the page away is an exit too: the frame has to hand back to the card
     // under the finger instead of waiting for the pop.
     val exiting = entry.exiting || entry.previewing
-    // 手势返回时帧在 20% 处就落到卡片上（手指停住时看到的就是松手后的位置）；
-    // 按钮 / 普通返回没有跟手过程，必须走完整行程，过渡才不会被截短一截。
-    fun frameProgress(p: Float): Float =
-        if (exiting && entry.previewing) ((p - LandedProgress) / (1f - LandedProgress)).coerceIn(0f, 1f) else p
+    // 帧完整映射行程：跟手时 1:1 跟随手指到落点，不设提前落定的死区；
+    // 按钮 / 普通返回同样走完整行程。
+    fun frameProgress(p: Float): Float = p
 
     Box(
         Modifier

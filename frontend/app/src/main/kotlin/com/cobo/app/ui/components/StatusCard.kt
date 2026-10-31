@@ -281,7 +281,9 @@ fun ImageGrid(
         return
     }
 
-    val columns = if (pics.size <= 4) 2 else 3
+    // 排版规则：≥3 张一律三列，优先把第一行排满（3 张就一行、4 张 3+1、7 张 3+3+1），
+    // 不做小图数的两列大格；2 张才用两列排满整行。格子等宽，尾行留白不拉伸。
+    val columns = if (pics.size == 2) 2 else 3
     val rows = (pics.size + columns - 1) / columns
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         for (row in 0 until rows) {
