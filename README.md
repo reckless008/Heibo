@@ -18,14 +18,13 @@
 </div>
 
 <div align="center">
-  <img src="docs/images/heibo-feed.jpg" width="18%" alt="信息流" />
-  <img src="docs/images/heibo-detail.jpg" width="18%" alt="详情评论" />
-  <img src="docs/images/heibo-share.jpg" width="18%" alt="分享面板" />
-  <img src="docs/images/heibo-settings.jpg" width="18%" alt="设置" />
-  <img src="docs/images/heibo-profile.jpg" width="18%" alt="个人主页" />
+  <img src="docs/images/heibo-feed.jpg" width="23%" alt="信息流" />
+  <img src="docs/images/heibo-detail.jpg" width="23%" alt="详情评论" />
+  <img src="docs/images/heibo-share.jpg" width="23%" alt="分享面板" />
+  <img src="docs/images/heibo-settings.jpg" width="23%" alt="设置" />
 </div>
 
-<div align="center"><sub>信息流 · 详情评论 · 分享面板 · 设置 · 个人主页</sub></div>
+<div align="center"><sub>信息流 · 详情评论 · 分享面板 · 设置</sub></div>
 
 ---
 
