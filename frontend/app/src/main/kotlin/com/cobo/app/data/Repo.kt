@@ -1046,6 +1046,20 @@ class Repo(private val context: Context, private val store: Store) {
         return out
     }
 
+    /** 我的关注列表（`friendships/friends`），私信选人 / 好友头像选择用。 */
+    suspend fun followingList(uid: String, page: Int = 1, force: Boolean = false): List<User> {
+        val root = get(
+            Api.url(
+                "https://m.weibo.cn/api/friendships/friends",
+                mapOf("uid" to uid, "page" to page.toString()),
+            ),
+            cookie(),
+            force,
+        )
+        val arr = root.optJSONObject("data")?.optJSONArray("users") ?: return emptyList()
+        return (0 until arr.length()).mapNotNull { User.from(arr.optJSONObject(it)) }
+    }
+
     /**
      * 聊天记录。接口给的是**最新在前**，[ChatPage.messages] 保持这个顺序，
      * 界面用 `reverseLayout = true` 铺，index 0 落在屏幕最下面。

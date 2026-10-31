@@ -58,6 +58,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.graphics.Color
+import android.content.Intent
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -83,13 +85,16 @@ import com.cobo.app.ui.TopBarBounds
 import com.cobo.app.ui.attachToRow
 import com.cobo.app.ui.reportTopBarBottom
 import com.cobo.app.ui.CoboIcons
+import com.cobo.app.data.User
 import com.cobo.app.ui.components.ActionIcon
+import com.cobo.app.ui.components.GlassActionPill
 import com.cobo.app.ui.components.Avatar
 import com.cobo.app.ui.components.BackIconButton
 import com.cobo.app.ui.components.ErrorState
 import com.cobo.app.ui.components.InputDialog
 import com.cobo.app.ui.components.LoadingState
 import com.cobo.app.ui.components.MemberBadge
+import com.cobo.app.ui.components.ShareSheet
 import com.cobo.app.ui.components.StatusCard
 import com.cobo.app.ui.components.WeiboText
 import com.cobo.app.ui.components.fmtCount
@@ -109,7 +114,7 @@ import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Edit
-import io.github.suqi8.coui.kmp.icon.extended.Refresh
+import io.github.suqi8.coui.kmp.icon.extended.Share
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -131,6 +136,7 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
     var commentError by remember(id) { mutableStateOf<String?>(null) }
     var switchingSort by remember(id) { mutableStateOf(false) }
     var showSwitchProgress by remember(id) { mutableStateOf(false) }
+    var showShare by remember { mutableStateOf(false) }
     var repostDialog by remember { mutableStateOf(false) }
     var commentDialog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
@@ -410,6 +416,7 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
                         likeTag = Modifier.testTag("comment_like_$index"),
                         replyTag = Modifier.testTag("comment_reply_$index"),
                         readOnly = readOnly,
+                        onUser = { nav.push(Route.Profile(it.id)) },
                     ) {
                         val at = comments.indexOfFirst { it.id == comment.id }
                         if (at < 0) return@CommentCard
@@ -477,15 +484,10 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
                         navigationIcon = { BackIconButton { nav.pop() } },
                         actions = {
                             HighlightedIconButton(
-                                onClick = {
-                                    scope.launch {
-                                        status = runCatching { App.repo.detail(id, force = true) }.getOrNull()
-                                        loadComments(true, force = true)
-                                    }
-                                },
-                                modifier = Modifier.couiTopAppBarActionItem(),
+                                onClick = { showShare = true },
+                                modifier = Modifier.couiTopAppBarActionItem().testTag("detail_share"),
                             ) {
-                                Icon(COUIIcons.Refresh, "刷新", Modifier.size(24.dp))
+                                Icon(COUIIcons.Share, "分享", Modifier.size(24.dp))
                             }
                         },
                     )
@@ -493,36 +495,37 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
             }
         }
 
+        // 转发、评论、点赞：与信息流卡片同款的玻璃小胶囊，悬浮在评论之上。
+        // 左右内缩 26dp（页面 12 + 卡片内衬 14），与主页卡片里的胶囊位置、间距完全一致。
         Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(pageContainerColor())
                 .navigationBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 6.dp),
+                .padding(horizontal = 26.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceEvenly,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             val current = status
-            ActionIcon(
+            GlassActionPill(
                 icon = CoboIcons.Repost,
-                text = "转发 ${fmtCount(current?.reposts ?: 0)}",
+                text = fmtCount(current?.reposts ?: 0),
                 onClick = { repostDialog = true },
-                modifier = Modifier.weight(1f).testTag("detail_repost"),
+                modifier = Modifier.testTag("detail_repost"),
                 enabled = !readOnly,
             )
-            ActionIcon(
+            GlassActionPill(
                 icon = CoboIcons.Comment,
-                text = "评论 ${fmtCount(current?.comments ?: 0)}",
+                text = fmtCount(current?.comments ?: 0),
                 onClick = { commentDialog = true },
-                modifier = Modifier.weight(1f).testTag("detail_comment"),
+                modifier = Modifier.testTag("detail_comment"),
                 enabled = !readOnly,
             )
-            ActionIcon(
+            GlassActionPill(
                 icon = if (current?.liked == true) CoboIcons.HeartFill else CoboIcons.Heart,
-                text = if (current?.liked == true) "已赞" else "赞 ${fmtCount(current?.attitudes ?: 0)}",
+                text = fmtCount(current?.attitudes ?: 0),
                 onClick = {
-                    val s = status ?: return@ActionIcon
+                    val s = status ?: return@GlassActionPill
                     scope.launch {
                         runCatching { App.repo.like(s.id, s.liked) }.onSuccess {
                             status = s.copy(
@@ -534,8 +537,17 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
                 },
                 tint = if (current?.liked == true) scheme.primary
                 else scheme.onSurfaceSecondary,
-                modifier = Modifier.weight(1f).testTag("detail_like"),
+                modifier = Modifier.testTag("detail_like"),
                 enabled = !readOnly,
+            )
+        }
+    }
+
+    if (showShare) {
+        status?.let { current ->
+            ShareSheet(
+                status = current,
+                onDismiss = { showShare = false },
             )
         }
     }
@@ -585,6 +597,7 @@ private fun CommentCard(
     likeTag: Modifier = Modifier,
     replyTag: Modifier = Modifier,
     readOnly: Boolean = false,
+    onUser: (User) -> Unit = {},
     onLike: () -> Unit,
 ) {
     val scheme = COUITheme.colorScheme
@@ -656,15 +669,28 @@ private fun CommentCard(
 
     Card(modifier.fillMaxWidth()) {
         Row(Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Avatar(comment.user?.avatar, 34.dp)
+            Avatar(
+                comment.user?.avatar,
+                34.dp,
+                modifier = Modifier.clickable { comment.user?.let(onUser) },
+            )
             Spacer(Modifier.width(10.dp))
-            Column(Modifier.weight(1f)) {
+            // 点评论任意位置（链接除外）= 回复该评论作者。
+            Column(
+                Modifier
+                    .weight(1f)
+                    .then(
+                        if (readOnly) Modifier
+                        else Modifier.clickable { replyTarget = comment },
+                    ),
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         comment.user?.name.orEmpty(),
                         fontSize = 13.sp,
                         color = scheme.onSurface,
                         fontWeight = FontWeight.Medium,
+                        modifier = Modifier.clickable { comment.user?.let(onUser) },
                     )
                     val membership = comment.user?.membership ?: Membership.None
                     if (membership != Membership.None) {
@@ -718,6 +744,7 @@ private fun CommentCard(
                                 onLike = { likeReply(reply) },
                                 onReply = { replyTarget = reply },
                                 enabled = !readOnly,
+                                onUser = onUser,
                             )
                         }
                         when {
@@ -760,7 +787,10 @@ private fun CommentCard(
                 }
                 Spacer(Modifier.height(4.dp))
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
+                    // 右缘与楼中楼的点赞按钮对齐（引用块 8dp 内衬），点赞按钮列成一条线。
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(end = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
@@ -789,6 +819,8 @@ private fun CommentCard(
                     // badge stays visible at zero so the count is never missing.
                     Row(
                         modifier = likeTag
+                            // 点赞徽章固定尺寸：计数长短不再改变按钮宽度。
+                            .width(45.dp)
                             .clip(RoundedCornerShape(11.dp))
                             .background(
                                 if (comment.liked) scheme.primary.copy(alpha = 0.16f)
@@ -800,8 +832,9 @@ private fun CommentCard(
                                 if (readOnly) Modifier.alpha(0.38f)
                                 else Modifier.clickable(onClick = onLike),
                             )
-                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                            .padding(vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         Icon(
                             imageVector = if (comment.liked) CoboIcons.HeartFill else CoboIcons.Heart,
@@ -848,10 +881,24 @@ private fun ReplyRow(
     onLike: () -> Unit,
     onReply: () -> Unit,
     enabled: Boolean = true,
+    onUser: (User) -> Unit = {},
 ) {
     val scheme = COUITheme.colorScheme
-    Row(Modifier.padding(vertical = 3.dp)) {
-        Avatar(reply.user?.avatar, 22.dp)
+    // 整条回复可点：回复该层作者。楼中楼不再放缩小的「回复」按钮。
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .then(
+                if (enabled) Modifier.clickable(onClick = onReply)
+                else Modifier,
+            )
+            .padding(vertical = 3.dp),
+    ) {
+        Avatar(
+            reply.user?.avatar,
+            22.dp,
+            modifier = Modifier.clickable { reply.user?.let(onUser) },
+        )
         Spacer(Modifier.width(8.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -860,6 +907,7 @@ private fun ReplyRow(
                     fontSize = 12.sp,
                     color = scheme.onSurfaceSecondary,
                     fontWeight = FontWeight.Medium,
+                    modifier = Modifier.clickable { reply.user?.let(onUser) },
                 )
                 val membership = reply.user?.membership ?: Membership.None
                 if (membership != Membership.None) {
@@ -883,49 +931,41 @@ private fun ReplyRow(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
                 )
-                Text(
-                    "回复",
-                    fontSize = 11.sp,
-                    color = scheme.onSurfaceSecondary,
-                    modifier = Modifier
-                        .testTag("reply_reply")
-                        .clip(RoundedCornerShape(10.dp))
-                        .then(
-                            if (enabled) Modifier.clickable(onClick = onReply)
-                            else Modifier.alpha(0.38f),
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
-                Spacer(Modifier.width(2.dp))
+                Spacer(Modifier.width(4.dp))
                 Row(
                     modifier = Modifier
                         .testTag("reply_like")
-                        .clip(RoundedCornerShape(10.dp))
+                        // 点赞徽章固定尺寸；这条的右缘就是全评论区点赞列的对齐基准。
+                        .width(45.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        // 楼中楼是次级操作：底色与墨色都比主评论淡一档（DESIGN.md 的
+                        // 「UI recedes / 弱化墨色」层级原则），点赞态仍用主色表达状态。
                         .background(
-                            if (reply.liked) scheme.primary.copy(alpha = 0.16f)
-                            else scheme.onSurface.copy(
-                                alpha = if (scheme.background.luminance() < 0.5f) 0.20f else 0.12f
-                            )
+                            if (reply.liked) scheme.primary.copy(alpha = 0.12f)
+                            else scheme.onSurface.copy(alpha = 0.07f)
                         )
                         .then(
                             if (enabled) Modifier.clickable(onClick = onLike)
                             else Modifier.alpha(0.38f),
                         )
-                        .padding(horizontal = 7.dp, vertical = 2.dp),
+                        .padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
                 ) {
                     Icon(
                         imageVector = if (reply.liked) CoboIcons.HeartFill else CoboIcons.Heart,
                         contentDescription = if (reply.liked) "取消点赞" else "点赞",
-                        modifier = Modifier.size(11.dp),
-                        tint = if (reply.liked) scheme.primary else scheme.onSurface,
+                        modifier = Modifier.size(13.dp),
+                        tint = if (reply.liked) scheme.primary
+                        else scheme.onSurface.copy(alpha = 0.55f),
                     )
-                    Spacer(Modifier.width(3.dp))
+                    Spacer(Modifier.width(4.dp))
                     Text(
                         text = fmtCount(reply.likes),
-                        fontSize = 11.sp,
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Medium,
-                        color = if (reply.liked) scheme.primary else scheme.onSurface,
+                        color = if (reply.liked) scheme.primary
+                        else scheme.onSurface.copy(alpha = 0.55f),
                     )
                 }
             }

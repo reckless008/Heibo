@@ -332,6 +332,8 @@ fun CoboPredictiveBackHandler(nav: NavState) {
 
         var lastProgress = 1f
         var moved = false
+        // 是否出现过中间态：真手势会连续上报进度，按钮 / 键盘返回只有一发终点事件。
+        var sawGesture = false
         entry.previewing = true
         // The snapshot was recorded when the card was tapped; re-record it now so the page
         // hands back the card as it looks today, not as it looked under the finger.
@@ -339,10 +341,20 @@ fun CoboPredictiveBackHandler(nav: NavState) {
         try {
             events.collect { event ->
                 val value = (1f - event.progress).coerceIn(0f, 1f)
+                if (value in 0.02f..0.98f) sawGesture = true
                 if (value < 0.98f) moved = true
                 lastProgress = value
-                entry.progress.snapTo(value)
-                if (entry.expand) entry.fade.snapTo(value)
+                // 只跟真手势的进度；按钮返回的瞬时终点不许把页面一帧拽走。
+                if (sawGesture) {
+                    entry.progress.snapTo(value)
+                    if (entry.expand) entry.fade.snapTo(value)
+                }
+            }
+            if (!sawGesture) {
+                // 按钮 / 键盘返回：没有跟手过程，退回普通返回的完整动画。
+                entry.previewing = false
+                nav.pop()
+                return@PredictiveBackHandler
             }
             // Released past the threshold: finish from wherever the finger left the page.
             if (lastProgress <= 0.02f && moved) {
@@ -465,10 +477,10 @@ private fun ExpandLayer(
     // A gesture pulling the page away is an exit too: the frame has to hand back to the card
     // under the finger instead of waiting for the pop.
     val exiting = entry.exiting || entry.previewing
-    // On the way out the frame lands on the card this early in the gesture, so a finger held
-    // near the end of a back swipe already shows the page exactly as the release will leave it.
+    // 手势返回时帧在 20% 处就落到卡片上（手指停住时看到的就是松手后的位置）；
+    // 按钮 / 普通返回没有跟手过程，必须走完整行程，过渡才不会被截短一截。
     fun frameProgress(p: Float): Float =
-        if (exiting) ((p - LandedProgress) / (1f - LandedProgress)).coerceIn(0f, 1f) else p
+        if (exiting && entry.previewing) ((p - LandedProgress) / (1f - LandedProgress)).coerceIn(0f, 1f) else p
 
     Box(
         Modifier
@@ -509,7 +521,7 @@ private fun ExpandLayer(
                 // cross-fading instead of leaving a gap: a back gesture can hold the frame
                 // anywhere, and a gap would show the bare fill for as long as the finger stays.
                 val cardAlpha = if (exiting) {
-                    ((0.4f - p) / 0.32f).coerceIn(0f, 1f)
+                    ((0.55f - p) / 0.45f).coerceIn(0f, 1f)
                 } else {
                     1f - (fade() / 0.25f).coerceIn(0f, 1f)
                 }
@@ -550,7 +562,7 @@ private fun ExpandLayer(
                     // the frame and there is never a bare fill on screen.
                     val p = frameProgress(progress())
                     alpha = if (exiting) {
-                        1f - ((0.4f - p) / 0.32f).coerceIn(0f, 1f)
+                        1f - ((0.55f - p) / 0.45f).coerceIn(0f, 1f)
                     } else {
                         1f
                     }

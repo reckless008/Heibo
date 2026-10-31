@@ -10,12 +10,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.LinkInteractionListener
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -132,13 +135,21 @@ fun parseWeiboHtml(
                     if (glyphColor != null) addStyle(SpanStyle(color = glyphColor), glyphStart, length)
                 }
                 append(plain.substring(link.start, link.end))
+                // 显式链接样式：话题 / @ / 链接一律无下划线，颜色与字形同一个调灰强调蓝。
+                val linkStyles = TextLinkStyles(
+                    SpanStyle(
+                        color = glyphColor ?: Color.Unspecified,
+                        textDecoration = TextDecoration.None,
+                    ),
+                )
                 val annotation = if (onLink != null) {
                     LinkAnnotation.Url(
                         url = link.url,
+                        styles = linkStyles,
                         linkInteractionListener = LinkInteractionListener { onLink(link.url) },
                     )
                 } else {
-                    LinkAnnotation.Url(link.url)
+                    LinkAnnotation.Url(url = link.url, styles = linkStyles)
                 }
                 // 字形和文字一起进链接范围，点菱形/三角也能跳。
                 addLink(annotation, start, length)
@@ -161,7 +172,7 @@ fun WeiboText(
     color: Color = COUITheme.colorScheme.onSurface,
 ) {
     val linkHandler = LocalLinkHandler.current
-    val glyphColor = COUITheme.colorScheme.primary
+    val glyphColor = weiboAccentColor()
     val text = remember(html, linkHandler, glyphColor) {
         parseWeiboHtml(html, onLink = { linkHandler(it) }, glyphColor = glyphColor)
     }
@@ -178,6 +189,10 @@ fun WeiboText(
         )
     }
 }
+
+/** 话题 / @ / 链接 / 超话菱形共用色：主色已在主题里统一调灰，这里直接取主色。 */
+@Composable
+fun weiboAccentColor(): Color = COUITheme.colorScheme.primary
 
 private val EmojiImg = Regex("<img[^>]*?alt=\"([^\"]*)\"[^>]*?src=\"([^\"]*)\"[^>]*?>")
 
@@ -218,7 +233,7 @@ fun WeiboRichText(
     lineHeight: TextUnit = 22.sp,
     maxLines: Int = Int.MAX_VALUE,
     color: Color = COUITheme.colorScheme.onSurface,
-    linkColor: Color = COUITheme.colorScheme.primary,
+    linkColor: Color = weiboAccentColor(),
     selectable: Boolean = true,
 ) {
     val linkHandler = LocalLinkHandler.current

@@ -131,44 +131,28 @@ fun StatusCard(
             )
         }
         Spacer(Modifier.height(10.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val meta = buildString {
-                append(formatWeiboTime(status.createdAt))
-                if (status.source.isNotBlank()) {
-                    if (isNotEmpty()) append("  ")
-                    append(status.source)
-                }
-                if (status.region.isNotBlank()) {
-                    if (isNotEmpty()) append("  ")
-                    append(status.region)
-                }
-            }
-            Text(
-                text = meta,
-                fontSize = 11.sp,
-                color = scheme.onSurfaceSecondary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            if (showActions) {
-                Spacer(Modifier.width(8.dp))
-                ActionIcon(
+        if (showActions) {
+            // 时间/机型/IP 已上移到昵称下方；底部由转发、评论、点赞的玻璃小胶囊居中占据，
+            // 三枚均分内容宽，左右边缘与图片对齐。
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                // 胶囊自适应收窄，两端仍对齐图片左右边缘，中间留白自然分开。
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                GlassActionPill(
                     icon = CoboIcons.Repost,
                     text = fmtCount(status.reposts),
                     onClick = onRepost,
                     enabled = actionsEnabled,
                 )
-                ActionIcon(
+                GlassActionPill(
                     icon = CoboIcons.Comment,
                     text = fmtCount(status.comments),
                     onClick = onComment,
                     enabled = actionsEnabled,
                 )
-                ActionIcon(
+                GlassActionPill(
                     icon = if (status.liked) CoboIcons.HeartFill else CoboIcons.Heart,
                     text = fmtCount(status.attitudes),
                     onClick = onLike,
@@ -224,8 +208,12 @@ fun StatusHeader(status: Status, onUser: (User) -> Unit, compact: Boolean) {
                 text = buildString {
                     append(formatWeiboTime(status.createdAt))
                     if (status.source.isNotBlank()) {
-                        append(" 来自 ")
+                        append("  来自 ")
                         append(status.source)
+                    }
+                    if (status.region.isNotBlank()) {
+                        append("  ")
+                        append(status.region)
                     }
                 },
                 fontSize = 11.sp,

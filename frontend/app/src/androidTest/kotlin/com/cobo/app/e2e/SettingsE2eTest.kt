@@ -52,32 +52,28 @@ class SettingsE2eTest : UiE2eTest() {
     }
 
     @Test
-    fun darkMode_cyclesBackToOriginal() {
+    fun appearanceSegments_switchModes() {
         openSettings()
         val before = App.settings.darkMode
         try {
-            repeat(3) {
-                val current = App.settings.darkMode
-                tapTag("settings_dark")
-                waitUntil("深色模式没有切换") { App.settings.darkMode != current }
+            // 外观模式是行内三段按钮（跟随系统/浅色/深色）：直接点段切换。
+            for (mode in 0..2) {
+                tapTag("appearance_option_$mode")
+                waitUntil("外观模式没有切到选项 $mode") { App.settings.darkMode == mode }
             }
-            assertEquals("深色模式没有回到初始值", before, App.settings.darkMode)
         } finally {
             App.settings.applyDarkMode(before)
         }
     }
 
     @Test
-    fun fontScale_cyclesBackToOriginal() {
+    fun fontSlider_rowPresentAndApplies() {
         openSettings()
+        assertTrue("缺少字号滑杆", existsTag("settings_font"))
         val before = App.settings.fontScale
         try {
-            repeat(4) {
-                val current = App.settings.fontScale
-                tapTag("settings_font")
-                waitUntil("字号没有切换") { abs(App.settings.fontScale - current) > 0.001f }
-            }
-            assertEquals("字号没有回到初始值", before, App.settings.fontScale, 0.001f)
+            App.settings.applyFontScale(1.2f)
+            assertEquals("字号设置没有生效", 1.2f, App.settings.fontScale, 0.001f)
         } finally {
             App.settings.applyFontScale(before)
         }

@@ -2,6 +2,7 @@ package com.cobo.app.screen
 
 import android.webkit.CookieManager
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -11,8 +12,13 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -24,6 +30,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,6 +63,7 @@ import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.layout.DialogButtonBar
 import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
+import io.github.suqi8.coui.kmp.basic.Slider
 import io.github.suqi8.coui.kmp.preference.ArrowPreference
 import io.github.suqi8.coui.kmp.preference.SwitchPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
@@ -72,6 +80,7 @@ fun SettingsScreen(nav: NavState) {
     var acceptPrerelease by remember { mutableStateOf(App.settings.acceptPrerelease) }
     var inAppUpdate by remember { mutableStateOf(App.settings.inAppUpdate) }
     var predictiveBack by remember { mutableStateOf(App.settings.predictiveBack) }
+    var glassAlpha by remember { mutableStateOf(App.settings.glassAlpha) }
     var message by remember { mutableStateOf("") }
     var about by remember { mutableStateOf(false) }
     var logout by remember { mutableStateOf(false) }
@@ -120,28 +129,87 @@ fun SettingsScreen(nav: NavState) {
                     modifier = Modifier.fillMaxWidth(),
                     insideMargin = PaddingValues(0.dp),
                 ) {
-                    ArrowPreference(
-                        title = "深色模式",
-                        modifier = Modifier.testTag("settings_dark"),
-                        summary = when (darkMode) {
-                            1 -> "浅色"
-                            2 -> "深色"
-                            else -> "跟随系统"
-                        },
-                        cardListPosition = CardListPosition.Head,
-                        onClick = {
-                            darkMode = App.settings.cycleDarkMode()
+                    AppearanceRow(
+                        selected = darkMode,
+                        onSelect = { mode ->
+                            darkMode = mode
+                            App.settings.applyDarkMode(mode)
                         },
                     )
                     PreferenceDivider()
-                    ArrowPreference(
-                        title = "字号",
-                        modifier = Modifier.testTag("settings_font"),
-                        summary = "${(fontScale * 100).toInt()}%",
-                        onClick = {
-                            fontScale = App.settings.cycleFontScale()
-                        },
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_font")
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.width(96.dp)) {
+                            Text(
+                                "字号",
+                                fontSize = 15.sp,
+                                color = COUITheme.colorScheme.onSurface,
+                            )
+                            Text(
+                                "当前 ${(fontScale * 100).toInt()}%",
+                                fontSize = 12.sp,
+                                color = COUITheme.colorScheme.onSurfaceSecondary,
+                            )
+                        }
+                        Slider(
+                            value = fontScale * 100f,
+                            onValueChange = {
+                                val v = it / 100f
+                                fontScale = v
+                                App.settings.applyFontScale(v)
+                            },
+                            valueRange = 80f..140f,
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(start = 8.dp),
+                        )
+                    }
+                    PreferenceDivider()
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_glass_alpha")
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.width(96.dp)) {
+                            Text(
+                                "玻璃透明度",
+                                fontSize = 15.sp,
+                                color = COUITheme.colorScheme.onSurface,
+                            )
+                        }
+                        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                            Row(Modifier.fillMaxWidth()) {
+                                Text(
+                                    "轻透磨砂",
+                                    fontSize = 11.sp,
+                                    color = COUITheme.colorScheme.onSurfaceSecondary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    "柔光玻璃",
+                                    fontSize = 11.sp,
+                                    color = COUITheme.colorScheme.onSurfaceSecondary,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.End,
+                                )
+                            }
+                            Slider(
+                                value = glassAlpha.toFloat(),
+                                onValueChange = {
+                                    glassAlpha = it.toInt()
+                                    App.settings.applyGlassAlpha(it.toInt())
+                                },
+                                valueRange = 0f..100f,
+                            )
+                        }
+                    }
                     PreferenceDivider()
                     SwitchPreference(
                         checked = predictiveBack,
@@ -336,7 +404,7 @@ fun SettingsScreen(nav: NavState) {
                     ArrowPreference(
                         title = "关于",
                         modifier = Modifier.testTag("settings_about"),
-                        summary = "Cobo · COUI 前端",
+                        summary = "Heibo · COUI 前端",
                         cardListPosition = CardListPosition.Tail,
                         onClick = { about = true },
                     )
@@ -415,8 +483,8 @@ fun SettingsScreen(nav: NavState) {
 
     if (about) {
         ConfirmDialog(
-            title = "关于 Cobo",
-            message = "Cobo · COUI 前端 v$version\n\n使用 COUI（ColorOS 17 设计语言）重建的第三方微博客户端。\n仅用于个人学习与研究。",
+            title = "关于 Heibo",
+            message = "Heibo · COUI 前端 v$version\n\n使用 COUI（ColorOS 17 设计语言）重建的第三方微博客户端。\n仅用于个人学习与研究。",
             confirmText = "知道了",
             onDismiss = { about = false },
             onConfirm = { about = false },
@@ -491,12 +559,9 @@ fun SettingsScreen(nav: NavState) {
             },
         )
     }
+
 }
 
-/**
- * 「本地关注」取数账号选择。和 [FeedTabPicker] 同一套弹窗：胶囊高亮能按住上下拖着换项，
- * 选中项先记下来，等窗口收完再交出去，避免和关闭动画抢时序。
- */
 @Composable
 private fun LocalFollowPicker(
     accounts: List<Account>,
@@ -626,6 +691,64 @@ private fun FeedTabPicker(
                 negative = DialogButtonBarAction(text = "取消", onClick = { show = false }),
                 positive = null,
             )
+        }
+    }
+}
+
+/**
+ * 外观模式：标题在左，右侧直接放「跟随系统 / 浅色模式 / 深色模式」三段按钮，
+ * 点击即切换，不弹选择器。
+ */
+@Composable
+private fun AppearanceRow(
+    selected: Int,
+    onSelect: (Int) -> Unit,
+) {
+    val scheme = COUITheme.colorScheme
+    val dark = scheme.background.luminance() < 0.5f
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("settings_dark")
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "外观模式",
+            fontSize = 15.sp,
+            color = scheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Row(
+            Modifier
+                .clip(RoundedCornerShape(16.dp))
+                .background(if (dark) Color(0xFF353535) else Color(0xFFE2E3E4))
+                .padding(3.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            listOf("跟随系统", "浅色模式", "深色模式").forEachIndexed { index, label ->
+                val on = index == selected
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(
+                            // 选中态用强调蓝，和同组滑杆 / 开关的强调色统一。
+                            if (on) scheme.primary else Color.Transparent,
+                        )
+                        .clickable {
+                            onSelect(index)
+                        }
+                        .testTag("appearance_option_$index")
+                        .padding(horizontal = 9.dp, vertical = 6.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        label,
+                        fontSize = 12.sp,
+                        color = if (on) scheme.onPrimary else scheme.onSurfaceSecondary,
+                    )
+                }
+            }
         }
     }
 }

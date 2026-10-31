@@ -125,6 +125,9 @@ class Settings(context: Context) {
      * 没有跟手的预览动画。默认开。
      */
     var predictiveBack by mutableStateOf(sp.getBoolean("predictive_back", true))
+
+    /** 玻璃透明度 0..100（越大越透），40 = 标准观感。 */
+    var glassAlpha by mutableIntStateOf(sp.getInt("glass_alpha", 40))
         private set
 
     /** 上次检查更新的时间戳，用来做 [UpdateCheckInterval] 节流。 */
@@ -207,6 +210,12 @@ class Settings(context: Context) {
     fun applyInAppUpdate(value: Boolean) {
         inAppUpdate = value
         sp.edit().putBoolean("in_app_update", value).apply()
+    }
+
+    fun applyGlassAlpha(value: Int) {
+        val v = value.coerceIn(0, 100)
+        glassAlpha = v
+        sp.edit().putInt("glass_alpha", v).apply()
     }
 
     fun applyPredictiveBack(value: Boolean) {

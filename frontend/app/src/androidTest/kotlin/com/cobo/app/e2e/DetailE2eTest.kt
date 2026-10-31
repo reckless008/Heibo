@@ -98,7 +98,7 @@ class DetailE2eTest : UiE2eTest() {
 
     @Test
     fun editHistory_opensFromEditedPost() {
-        tapTag("feed_tab_follow")
+        openFollowFilterMenu()
         device.pressBack()
         device.waitForIdle(500)
         waitTag("feed_page_1")

@@ -120,6 +120,16 @@ abstract class UiE2eTest {
 
     protected fun tapTag(tag: String) = clickSelector(By.res(tag), "节点 [$tag]")
 
+    /**
+     * 打开「关注」段的筛选菜单。顶栏分段是两段式交互：没选中先选中，选中后再点才弹出菜单。
+     * 每个用例都从「推荐」段起步（见 [launchApp]），所以第一下必定只是选中。
+     */
+    protected fun openFollowFilterMenu() {
+        tapTag("feed_tab_follow")
+        waitTag("feed_page_1", UI_WAIT)
+        tapTag("feed_tab_follow")
+    }
+
     protected fun tapText(text: String) = clickSelector(By.text(text), "文本 [$text]")
 
     protected fun clickText(text: String, timeout: Long = UI_WAIT) =

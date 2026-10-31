@@ -1,7 +1,6 @@
 package com.cobo.app.ui
 
 import androidx.compose.animation.Crossfade
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -46,25 +45,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cobo.app.App
-import com.cobo.app.R
 import com.cobo.app.data.FeedPage
 import com.cobo.app.data.FeedTabItem
 import com.cobo.app.screen.FeedFilter
@@ -74,9 +68,10 @@ import com.cobo.app.screen.LocalMessagesPlaceholder
 import com.cobo.app.screen.MessagesScreen
 import com.cobo.app.screen.ProfileContent
 import com.cobo.app.screen.TimelineScreen
+import com.cobo.app.ui.components.glassPlate
+import com.cobo.app.ui.components.glassPlateAlpha
+import com.cobo.app.ui.components.liquidGlass
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlay
-import io.github.suqi8.coui.kmp.basic.BottomFloatingAccessoryNavigationBar
-import io.github.suqi8.coui.kmp.basic.BottomFloatingNavigationBarItem
 import io.github.suqi8.coui.kmp.basic.DropdownImpl
 import io.github.suqi8.coui.kmp.basic.DropdownItem
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
@@ -87,6 +82,7 @@ import io.github.suqi8.coui.kmp.basic.LocalEdgeToEdge
 import io.github.suqi8.coui.kmp.basic.SearchBarActionButton
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TopAppBarDefaults
+import io.github.suqi8.coui.kmp.basic.couiGlassSurface
 import io.github.suqi8.coui.kmp.basic.couiTopAppBarActionItem
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
@@ -95,10 +91,6 @@ import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.basic.ExpandableIndicator
 import io.github.suqi8.coui.kmp.icon.basic.Search
 import io.github.suqi8.coui.kmp.icon.extended.Add
-import io.github.suqi8.coui.kmp.icon.extended.ContactsCircle
-import io.github.suqi8.coui.kmp.icon.extended.Home
-import io.github.suqi8.coui.kmp.icon.extended.Messages
-import io.github.suqi8.coui.kmp.icon.extended.Refresh
 import io.github.suqi8.coui.kmp.icon.extended.Settings
 import io.github.suqi8.coui.kmp.overlay.OverlayListPopup
 import io.github.suqi8.coui.kmp.theme.COUITheme
@@ -270,19 +262,12 @@ fun MainShell(nav: NavState) {
         }
     }
 
-    val feedHasTabs = feedTabs.size > 1
     // The top bar floats over the lists; the first row starts below it and later rows scroll under.
     // 栏钉在自己的密度上，页面按系统密度排版，所以这里要按像素换算回当前密度。
-    // 消息 and 我 wear the feed's title row alone, so their bar is exactly one row tall.
+    // 三个页签共用一行高：主页的标题行已删，行内是「搜索 | 分段 | 发布」三件套。
     val topBarHeight = pinnedHeight(FeedTitleRowHeight)
-    // The feed header is two rows: the title row folds away as the list scrolls, the segment row
-    // stays pinned under the status bar.
-    val feedTopBarHeight = if (feedHasTabs) {
-        pinnedHeight(FeedTitleRowHeight, TopAppBarDefaults.SmallTopAppBarCenterHeight)
-    } else {
-        topBarHeight
-    }
-    var feedCollapse by remember { mutableFloatStateOf(0f) }
+    // 「我」页的滚动量：标题随上滑折起隐藏。
+    var profileCollapse by remember { mutableFloatStateOf(0f) }
 
     Box(Modifier.fillMaxSize()) {
         // The bar floats over the page, so the line it ends at is reported from the bar itself and
@@ -311,8 +296,7 @@ fun MainShell(nav: NavState) {
                                 emptyTexts = feedEmptyTexts,
                                 followStore = followStore,
                                 recommendStore = recommendStore,
-                                topInset = feedTopBarHeight,
-                                onScrollOffset = { feedCollapse = it },
+                                topInset = topBarHeight,
                             )
                             1 -> if (guest) {
                                 LocalMessagesPlaceholder(nav, topBarHeight)
@@ -329,6 +313,7 @@ fun MainShell(nav: NavState) {
                                 modifier = Modifier.fillMaxSize(),
                                 topInset = topBarHeight,
                                 extraBottom = FloatingBarContentGap,
+                                onScrollOffset = { profileCollapse = it },
                             )
                         }
                     }
@@ -351,8 +336,11 @@ fun MainShell(nav: NavState) {
                     feedTabs = feedTabs,
                     guest = guest,
                     filter = filter,
-                    collapsePx = feedCollapse,
+                    collapsePx = profileCollapse,
                     bounds = topBarBounds,
+                    onPublish = {
+                        if (guest) App.toast("纯本地模式不能发微博，登录后可用") else nav.push(Route.Publish())
+                    },
                     onFilterSelected = { selected ->
                         filterIndex = selected.ordinal
                         App.settings.applyFeedFilter(selected.ordinal)
@@ -375,14 +363,7 @@ fun MainShell(nav: NavState) {
                 FloatingBottomBar(
                     tab = tab,
                     onTab = nav::setTab,
-                    // 刷新键跟随当前页：消息页刷消息，其余仍走微博回顶刷新。
-                    onRefresh = {
-                        if (tab == 1) App.requestMessagesTop() else App.requestFeedTop()
-                    },
                     onFeedTop = { App.requestFeedTop() },
-                    onPublish = {
-                        if (guest) App.toast("纯本地模式不能发微博，登录后可用") else nav.push(Route.Publish())
-                    },
                     modifier = Modifier.align(Alignment.BottomCenter),
                 )
             }
@@ -408,7 +389,7 @@ private suspend fun originalFeed(cursor: String?, force: Boolean): FeedPage {
     return FeedPage(emptyList(), next)
 }
 
-private val FloatingBarContentGap = 50.dp
+private val FloatingBarContentGap = 64.dp
 
 /** Cross-fade length for a bottom-bar tab switch. */
 private const val MainTabFadeMillis = 220
@@ -416,11 +397,9 @@ private const val MainTabFadeMillis = 220
 /**
  * The floating bar over the three tabs.
  *
- * The material is one platform backdrop blur for the whole bar, never two. Two of them fading
- * against each other made the incoming one blur the outgoing one's veil as well: that band under
- * the title darkened to more than either tab shows at rest, then snapped back the frame the old
- * layer was dropped — the flash the tab switch used to have. So only the content cross-fades here,
- * and the material's height follows the tab instead (the feed wears an extra segment row).
+ * 消息 / 我 两页顶栏是标题行，底下铺一层 AppBarBlurOverlay 渐变玻璃；主页的顶栏只有一行
+ * 「搜索 | 分段 | 发布」，三件各自带玻璃材质、悬浮在内容上，不再铺整条模糊带——上滑时
+ * 顶部那一大块固定模糊随之消失。材质只有一层：切页时用透明度淡入淡出，不做两层互相采样。
  */
 @Composable
 private fun MainTopBar(
@@ -430,57 +409,33 @@ private fun MainTopBar(
     feedTabs: List<FeedTabSpec>,
     guest: Boolean,
     filter: FeedFilter,
-    collapsePx: Float,
+    /** 「我」页列表的滚动量；非「我」页忽略。 */
+    collapsePx: Float = 0f,
     bounds: TopBarBounds,
+    onPublish: () -> Unit,
     onFilterSelected: (FeedFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val pageBarHeight = statusBarTop + FeedTitleRowHeight
-    val feedHasTabs = feedTabs.size > 1
-    val feedBarHeight = if (feedHasTabs) {
-        pageBarHeight + TopAppBarDefaults.SmallTopAppBarCenterHeight
-    } else {
-        pageBarHeight
-    }
+    // 「我」页标题随滚动折起：0 = 完整，1 = 完全隐藏（只影响标题，动作钮不动）。
     val titleHeightPx = with(LocalDensity.current) { FeedTitleRowHeight.toPx() }
-    val collapsed = (collapsePx / titleHeightPx).coerceIn(0f, 1f)
-    // 只有微博页会把标题行折进状态栏。切走时把这个折叠量收回 0，材质才不会停在上一页的位置。
-    // 折叠时上移的只有材质：内容的折叠轨迹一直是按「栏顶 = 0」写的（标题往上折、分段行往下贴），
-    // 原来材质和内容是一层套一层，两个等量反向的偏移互相抵消；这里内容已经移出材质节点，
-    // 就不要再给它补偏移，否则折叠量会被算两遍。
-    // 两个动画量都在布局/绘制阶段才读（下面的 lambda 里），否则每一帧都会把整条栏重新组合一遍。
-    val feedWeight = animateFloatAsState(
-        targetValue = if (tab == 0) 1f else 0f,
+    val titleCollapse = if (tab == 2) (collapsePx / titleHeightPx).coerceIn(0f, 1f) else 0f
+    // 只有消息页保留渐变玻璃带；主页和「我」都是悬浮件、不要模糊带。缓动只改透明度。
+    val materialAlpha = animateFloatAsState(
+        targetValue = if (tab == 1) 1f else 0f,
         animationSpec = tween(MainTabFadeMillis),
-        label = "mainBarFeedWeight",
+        label = "mainBarMaterialAlpha",
     )
-    val materialShift = { (collapsed * titleHeightPx * feedWeight.value).roundToInt() }
-    val materialHeight = animateDpAsState(
-        targetValue = if (tab == 0) feedBarHeight else pageBarHeight,
-        animationSpec = tween(MainTabFadeMillis),
-        label = "mainBarMaterialHeight",
-    )
-    Box(modifier) {
-        AppBarBlurOverlay(
-            modifier = Modifier
-                .fillMaxWidth()
-                .offset { IntOffset(0, -materialShift()) }
-                .reportTopBarBottom(bounds),
-            containerColor = pageContainerColor(),
-            scrollFraction = { 1f },
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .layout { measurable, constraints ->
-                        val height = materialHeight.value.roundToPx()
-                        val placeable = measurable.measure(
-                            Constraints.fixed(constraints.maxWidth, height)
-                        )
-                        layout(placeable.width, height) { placeable.place(0, 0) }
-                    }
-            )
+    Box(modifier.reportTopBarBottom(bounds)) {
+        Box(Modifier.graphicsLayer { alpha = materialAlpha.value }) {
+            AppBarBlurOverlay(
+                modifier = Modifier.fillMaxWidth(),
+                containerColor = pageContainerColor(),
+                scrollFraction = { 1f },
+            ) {
+                Box(Modifier.fillMaxWidth().height(pageBarHeight))
+            }
         }
         Crossfade(
             targetState = tab,
@@ -494,7 +449,8 @@ private fun MainTopBar(
                 feedTabs = feedTabs,
                 guest = guest,
                 filter = filter,
-                collapsed = collapsed,
+                titleCollapse = titleCollapse,
+                onPublish = onPublish,
                 onFilterSelected = onFilterSelected,
             )
         }
@@ -509,7 +465,8 @@ private fun BarContent(
     feedTabs: List<FeedTabSpec>,
     guest: Boolean,
     filter: FeedFilter,
-    collapsed: Float,
+    titleCollapse: Float = 0f,
+    onPublish: () -> Unit,
     onFilterSelected: (FeedFilter) -> Unit,
 ) {
     when (tab) {
@@ -518,9 +475,9 @@ private fun BarContent(
             feedTabs = feedTabs,
             filterMenu = !guest,
             filter = filter,
-            collapsed = collapsed,
             onFilterSelected = onFilterSelected,
             onSearch = { nav.push(Route.Search) },
+            onPublish = onPublish,
         )
 
         1 -> PageTitleBar(
@@ -538,6 +495,7 @@ private fun BarContent(
 
         else -> PageTitleBar(
             title = "我",
+            collapsed = titleCollapse,
             actions = {
                 HighlightedIconButton(
                     onClick = { nav.push(Route.Settings) },
@@ -551,15 +509,18 @@ private fun BarContent(
 }
 
 /**
- * Single-row page header for the tabs that have no segment row. It repeats the feed's title row
- * exactly — same height, title size and action slot — so the search, 通知 and 设置 buttons all land
- * on the same pixel across the three tabs.
+ * Single-row page header for the tabs that have no segment row. It matches the feed's
+ * 「搜索 | 分段 | 发布」row in height, so 搜索, 通知 and 设置 buttons all land on the same
+ * pixel across the three tabs.
  */
 @Composable
 private fun PageTitleBar(
     title: String,
+    /** 标题折叠量（0 = 展开，1 = 隐藏）：随列表上滑把标题推走。 */
+    collapsed: Float = 0f,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
+    val titleHeightPx = with(LocalDensity.current) { FeedTitleRowHeight.toPx() }
     Column(
         Modifier
             .fillMaxWidth()
@@ -568,12 +529,13 @@ private fun PageTitleBar(
         Box(Modifier.fillMaxWidth().height(FeedTitleRowHeight)) {
             Text(
                 title,
-                color = COUITheme.colorScheme.onSurface,
+                color = COUITheme.colorScheme.onSurface.copy(alpha = 1f - collapsed),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Medium,
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 16.dp, bottom = 6.dp),
+                    .padding(start = 16.dp, bottom = 6.dp)
+                    .graphicsLayer { translationY = -collapsed * titleHeightPx },
             )
             Row(
                 modifier = Modifier
@@ -597,12 +559,12 @@ private const val RecommendPage = 2
 private val FeedTabLabels = listOf("好友圈", "关注", "推荐")
 private val FeedTabTags = listOf("feed_tab_circle", "feed_tab_follow", "feed_tab_recommend")
 
-/** Height of the feed header's title row; the list folds exactly this much away when it scrolls. */
+/** Height of the top bar's single row on all three tabs. */
 internal val FeedTitleRowHeight = 44.dp
 
 /**
- * Two-row feed header: the title sits at the top left and folds away as the list scrolls, while
- * the segment row stays pinned under the status bar.
+ * Single-row feed header, floating glass pieces with no blur band behind them:
+ * 搜索圆钮在左、分段胶囊居中、发布圆钮在右，三件同一行高。
  */
 @Composable
 private fun FeedHeader(
@@ -610,79 +572,63 @@ private fun FeedHeader(
     feedTabs: List<FeedTabSpec>,
     filterMenu: Boolean,
     filter: FeedFilter,
-    collapsed: Float,
     onFilterSelected: (FeedFilter) -> Unit,
     onSearch: () -> Unit,
+    onPublish: () -> Unit,
 ) {
     val scope = rememberCoroutineScope()
-    val scheme = COUITheme.colorScheme
-    val titleHeightPx = with(LocalDensity.current) { FeedTitleRowHeight.toPx() }
     var filterMenuExpanded by remember { mutableStateOf(false) }
-    Column(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .padding(top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding())
+            .height(FeedTitleRowHeight),
     ) {
-        Box(Modifier.fillMaxWidth().height(FeedTitleRowHeight)) {
-            // Only the title folds away under the status bar; clipping the whole row cut the
-            // search button's halo off in a straight line.
-            Box(Modifier.fillMaxSize().clipToBounds()) {
-                Box(Modifier.fillMaxSize().graphicsLayer {
-                    translationY = -collapsed * titleHeightPx
-                }) {
-                    Text(
-                        stringResource(R.string.app_name),
-                        color = scheme.onSurface.copy(alpha = 1f - collapsed),
-                        fontSize = 24.sp,
-                        fontWeight = FontWeight.Medium,
-                        modifier = Modifier
-                            .align(Alignment.BottomStart)
-                            .padding(start = 16.dp, bottom = 6.dp),
-                    )
-                }
-            }
-            HighlightedIconButton(
-                onClick = onSearch,
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .padding(end = TopAppBarDefaults.ActionIconPadding)
-                    .couiTopAppBarActionItem()
-                    .graphicsLayer {
-                        // 按钮居中在标题行里，行高不变时折一半才是原来那条轨迹。
-                        translationY = -collapsed * titleHeightPx / 2f
-                        alpha = 1f - collapsed
-                    }
-                    .testTag("top_search"),
-            ) {
-                Icon(COUIIcons.Basic.Search, "搜索", Modifier.size(24.dp))
-            }
+        // 分段胶囊的宽度上限 = 行宽 - 两侧圆钮各自的一段边距；超宽时胶囊收缩而不是把圆钮挤走。
+        val sideZone = TopBarButtonZone
+        val pillMaxWidth = maxWidth - sideZone * 2
+        HighlightedIconButton(
+            onClick = onSearch,
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .padding(start = TopBarButtonMargin)
+                .testTag("top_search"),
+        ) {
+            Icon(COUIIcons.Basic.Search, "搜索", Modifier.size(24.dp))
         }
         if (feedTabs.size > 1) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(TopAppBarDefaults.SmallTopAppBarCenterHeight)
-                    .graphicsLayer { translationY = -collapsed * titleHeightPx },
-            ) {
-                FeedTabs(
-                    pager = feedPager,
-                    feedTabs = feedTabs,
-                    filterMenu = filterMenu,
-                    filter = filter,
-                    filterMenuExpanded = filterMenuExpanded,
-                    onFilterMenuDismiss = { filterMenuExpanded = false },
-                    onFilterSelected = {
-                        filterMenuExpanded = false
-                        onFilterSelected(it)
-                    },
-                    onSelect = { page -> scope.launch { feedPager.animateScrollToPage(page) } },
-                    onFilterClick = { filterMenuExpanded = true },
-                    modifier = Modifier.align(Alignment.Center),
-                )
-            }
+            FeedTabs(
+                pager = feedPager,
+                feedTabs = feedTabs,
+                filterMenu = filterMenu,
+                filter = filter,
+                filterMenuExpanded = filterMenuExpanded,
+                onFilterMenuDismiss = { filterMenuExpanded = false },
+                onFilterSelected = {
+                    filterMenuExpanded = false
+                    onFilterSelected(it)
+                },
+                onSelect = { page -> scope.launch { feedPager.animateScrollToPage(page) } },
+                onFilterClick = { filterMenuExpanded = true },
+                maxWidth = pillMaxWidth,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
+        HighlightedIconButton(
+            onClick = onPublish,
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = TopBarButtonMargin)
+                .testTag("top_publish"),
+        ) {
+            Icon(COUIIcons.Add, "发微博", Modifier.size(24.dp))
         }
     }
 }
+
+/** Top-bar side buttons: 40dp 圆钮 + 边距 + 与胶囊之间的间隙。 */
+private val TopBarButtonMargin = 12.dp
+private val TopBarButtonZone = TopBarButtonMargin + 40.dp + 8.dp
 
 // COUI's segment control opts out of LocalIndication — COUIIndication paints a rectangular state
 // layer over the whole tab bounds, which reads as a square shadow — and scales the pressed
@@ -700,13 +646,13 @@ private fun FeedTabs(
     onFilterSelected: (FeedFilter) -> Unit,
     onSelect: (Int) -> Unit,
     onFilterClick: () -> Unit,
+    /** 分段胶囊可用的最大宽度（行宽减去两侧圆钮的占位），超出时格子收窄。 */
+    maxWidth: Dp,
     modifier: Modifier = Modifier,
 ) {
     val scheme = COUITheme.colorScheme
-    // ColorOS's opaque segment capsule (COUI `opaqueTabRowColors`): #353535 / #E2E3E4 container,
-    // translucent white indicator over it.
+    // 玻璃胶囊 + 半透明白指示块，与底栏同一套液态玻璃材质。
     val dark = scheme.background.luminance() < 0.5f
-    val containerColor = if (dark) Color(0xFF353535) else Color(0xFFE2E3E4)
     val indicatorColor = if (dark) Color(0x33FFFFFF) else Color(0xB2FFFFFF)
     val labels = feedTabs.map { it.label }
     val interactions = remember(feedTabs.size) { List(feedTabs.size) { MutableInteractionSource() } }
@@ -717,9 +663,10 @@ private fun FeedTabs(
         label = "feedTabIndicatorScale",
     )
     // 三格同宽，按「4 个字 + 箭头」预留，字数是 2/3/4 时胶囊和位置都不动。
-    // 用 sp 折算，系统字体放大时格子跟着变宽，不会被截断。
+    // 用 sp 折算，系统字体放大时格子跟着变宽，不会被截断；两侧圆钮占位不够时格子才收窄。
     val density = LocalDensity.current
-    val segmentWidth = with(density) { (4 * 13).sp.toDp() } + 2.dp + 10.dp + 22.dp
+    val preferredSegment = with(density) { (4 * 13).sp.toDp() } + 2.dp + 10.dp + 18.dp
+    val segmentWidth = preferredSegment.coerceAtMost((maxWidth - 8.dp) / feedTabs.size)
     val containerWidth = segmentWidth * feedTabs.size + 8.dp
     val segmentWidthPx = with(density) { segmentWidth.toPx() }
     val restHeightPx = with(density) { 32.dp.toPx() }
@@ -792,13 +739,16 @@ private fun FeedTabs(
         0f
     }
 
+    // couiGlassSurface 丢弃它前面的 modifier，align 之类的位置信息只能排在它后面。
+    // 材质用液态玻璃，形状用上游的连续曲率胶囊（CouiSegmentCapsuleShape），动效沿用 CouiSegmentIndicatorMotion。
     BoxWithConstraints(
-        modifier
-            // Opaque 40dp capsule, the same height as the search action in the header row.
+        Modifier
+            .liquidGlass(CouiSegmentCapsuleShape, glassPlate(dark), glassPlateAlpha(dark))
+            .then(modifier)
+            // 40dp 胶囊，与两侧圆钮同高；clip 裁住指示块的圆角。
             .requiredHeight(40.dp)
             .width(containerWidth)
-            .clip(CouiSegmentCapsuleShape)
-            .background(containerColor),
+            .clip(CouiSegmentCapsuleShape),
     ) {
         val drawW = with(density) { (motion.width * indicatorScale).toDp() }
         val drawH = with(density) { (motion.height * indicatorScale).toDp() }
@@ -832,8 +782,12 @@ private fun FeedTabs(
                     modifier = Modifier.weight(1f),
                     showArrow = menu,
                     onClick = {
-                        handleSelect(index)
-                        if (menu) onFilterClick()
+                        // 两段式：没选中先选中，选中后再点才弹出筛选分类；切换走 handleSelect 以触发压扁动效。
+                        if (index == pager.currentPage) {
+                            if (menu) onFilterClick()
+                        } else {
+                            handleSelect(index)
+                        }
                     },
                 ) {
                     if (menu) {
@@ -927,13 +881,19 @@ private fun FeedTabSegment(
     }
 }
 
+private val GlassBarHeight = 52.dp
+private val GlassBarRadius = 26.dp
+private val GlassBarBottomGap = 18.dp
+
+/**
+ * 悬浮玻璃底栏：三个页签一枚液态玻璃胶囊。刷新入口已移除（下拉刷新保留），
+ * 发布「+」移到顶栏右侧。
+ */
 @Composable
 private fun FloatingBottomBar(
     tab: Int,
     onTab: (Int) -> Unit,
-    onRefresh: () -> Unit,
     onFeedTop: () -> Unit,
-    onPublish: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 双击「微博」= 回到顶部。用时间戳判定而不是 detectTapGestures：底栏 item 内部的
@@ -950,60 +910,24 @@ private fun FloatingBottomBar(
         }
         onTab(0)
     }
+    val dark = COUITheme.colorScheme.background.luminance() < 0.5f
     Box(
         modifier
             .fillMaxWidth()
             .navigationBarsPadding()
     ) {
-        // 尺寸不再在这里手改：整棵树已在 CoboRoot 钉到相册密度，
-        // 底栏条 56dp / 项 48dp / 圆钮 56dp 由组件自己的 token 决定。
-        run {
-            BottomFloatingAccessoryNavigationBar(
-                modifier = Modifier,
-                startAccessory = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("bottom_refresh")
-                            .clickable(
-                                interactionSource = null,
-                                indication = null,
-                                role = Role.Button,
-                                onClick = onRefresh,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            COUIIcons.Refresh,
-                            "刷新",
-                            tint = COUITheme.colorScheme.onSurface,
-                        )
-                    }
-                },
-                endAccessory = {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .testTag("bottom_publish")
-                            .clickable(
-                                interactionSource = null,
-                                indication = null,
-                                role = Role.Button,
-                                onClick = onPublish,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            COUIIcons.Add,
-                            "发微博",
-                            tint = COUITheme.colorScheme.onSurface,
-                        )
-                    }
-                },
+        // couiGlassSurface 丢弃它前面的 modifier，胶囊的浮空位置放在外层 Box 上。
+        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = GlassBarBottomGap)) {
+            Row(
+                Modifier
+                    .liquidGlass(RoundedCornerShape(GlassBarRadius), glassPlate(dark), glassPlateAlpha(dark))
+                    .height(GlassBarHeight)
+                    .padding(horizontal = 6.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 位置按用户要求交换：左「消息」、中「微博」、右「我」。tab 值仍沿用
                 // 0=微博 / 1=消息 / 2=我，只换视觉顺序，避免影响 nav.mainTab 的持久化语义。
-                BottomFloatingNavigationBarItem(
+                GlassBarItem(
                     selected = tab == 1,
                     onClick = { onTab(1) },
                     icon = CoboIcons.MessagesOutline,
@@ -1011,15 +935,15 @@ private fun FloatingBottomBar(
                     label = "消息",
                     modifier = Modifier.testTag("bottom_tab_messages"),
                 )
-                BottomFloatingNavigationBarItem(
+                GlassBarItem(
                     selected = tab == 0,
-                    onClick = { onFeedTap() },
+                    onClick = onFeedTap,
                     icon = CoboIcons.FeedOutline,
                     selectedIcon = CoboIcons.FeedFilled,
                     label = "微博",
                     modifier = Modifier.testTag("bottom_tab_feed"),
                 )
-                BottomFloatingNavigationBarItem(
+                GlassBarItem(
                     selected = tab == 2,
                     onClick = { onTab(2) },
                     icon = CoboIcons.ProfileOutline,
@@ -1029,5 +953,60 @@ private fun FloatingBottomBar(
                 )
             }
         }
+    }
+}
+
+/** 底栏页签：图标 + 小字标签，选中面性图标、未选中线性图标（COUI 17 规范）。 */
+@Composable
+private fun GlassBarItem(
+    selected: Boolean,
+    onClick: () -> Unit,
+    icon: ImageVector,
+    selectedIcon: ImageVector,
+    label: String,
+    modifier: Modifier = Modifier,
+) {
+    val tint = if (selected) {
+        COUITheme.colorScheme.onSurface
+    } else {
+        COUITheme.colorScheme.onSurface.copy(alpha = 0.4f)
+    }
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.96f else 1f,
+        animationSpec = FeedTabPressSpring,
+        label = "glassBarItemScale",
+    )
+    Column(
+        modifier
+            .width(52.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick,
+            )
+            .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Crossfade(
+            targetState = selected,
+            animationSpec = tween(180),
+            label = "glassBarIcon",
+        ) { sel ->
+            Icon(
+                if (sel) selectedIcon else icon,
+                label,
+                Modifier.size(24.dp),
+                tint = tint,
+            )
+        }
+        Text(label, fontSize = 10.sp, color = tint, maxLines = 1)
     }
 }

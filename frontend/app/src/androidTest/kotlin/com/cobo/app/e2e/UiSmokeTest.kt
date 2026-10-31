@@ -13,7 +13,7 @@ import org.junit.runner.RunWith
 
 /**
  * Covers the main shell: feed rendering, scrolling, the floating bottom bar and the
- * manual refresh action.
+ * manual refresh pipeline (back-to-top + pull refresh).
  */
 @RunWith(AndroidJUnit4::class)
 class UiSmokeTest : UiE2eTest() {
@@ -23,11 +23,10 @@ class UiSmokeTest : UiE2eTest() {
         waitText("推荐")
         waitText("关注")
         assertTrue("缺少搜索入口", existsTag("top_search"))
-        assertTrue("缺少刷新入口", existsTag("bottom_refresh"))
+        assertTrue("缺少发布入口", existsTag("top_publish"))
         assertTrue("缺少微博 Tab", existsTag("bottom_tab_feed"))
         assertTrue("缺少消息 Tab", existsTag("bottom_tab_messages"))
         assertTrue("缺少我 Tab", existsTag("bottom_tab_profile"))
-        assertTrue("缺少发布悬浮球", existsTag("bottom_publish"))
         waitTag("feed_card_0")
     }
 
@@ -60,8 +59,8 @@ class UiSmokeTest : UiE2eTest() {
         val own = io { App.repo.profile(uid) }
         assumeTrue("账号没有关注任何人", (own?.friends ?: 0) > 0)
 
-        tapTag("feed_tab_follow")
-        // The 关注 segment opens its filter dropdown on tap; close it to see the feed.
+        // 两段式：先选中「关注」段，再点一次弹出筛选菜单；关掉菜单看信息流。
+        openFollowFilterMenu()
         device.pressBack()
         device.waitForIdle(500)
         waitTag("feed_card_0")
@@ -87,8 +86,8 @@ class UiSmokeTest : UiE2eTest() {
         tapTag("feed_tab_circle")
         waitTag("feed_page_0")
 
-        // Tapping 关注 also opens its filter menu; close it to see the feed.
-        tapTag("feed_tab_follow")
+        // 「关注」段两段式弹出筛选菜单；关掉菜单看信息流。
+        openFollowFilterMenu()
         device.pressBack()
         device.waitForIdle(500)
         waitTag("feed_page_1")
@@ -113,22 +112,22 @@ class UiSmokeTest : UiE2eTest() {
     }
 
     @Test
-    fun refreshButton_keepsFeedUsable() {
+    fun manualRefresh_keepsFeedUsable() {
         waitTag("feed_card_0")
-        tapTag("bottom_refresh")
+        // 刷新按钮已移除，手动刷新走「回顶 + 下拉」的同一管线（双击「微博」触发的那条）。
+        App.requestFeedTop()
         waitTag("feed_card_0")
     }
 
     @Test
-    fun bottomBall_scrollsBackToTopAndRefreshes() {
+    fun feedTopRequest_scrollsBackToTopAndRefreshes() {
         waitTag("feed_card_0")
         // Go deep enough that the ride home cannot finish inside one frame or two.
         repeat(12) { swipeUp(0.2f) }
         device.waitForIdle(1_000)
         assertFalse("应当已经滚离顶部", existsTag("feed_card_0", 1_000))
 
-        val ball = waitTag("bottom_refresh")
-        ball.click()
+        App.requestFeedTop()
         // The ride home is animated: a moment after the tap the first card is still off screen.
         Thread.sleep(150)
         assertFalse("回顶没有动画，直接跳到了顶部", existsTag("feed_card_0", 0))

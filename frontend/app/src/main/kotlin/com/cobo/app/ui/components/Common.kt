@@ -18,11 +18,25 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -34,13 +48,21 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.cobo.app.App
 import com.cobo.app.data.Membership
 import io.github.suqi8.coui.kmp.basic.BasicComponentDefaults
+import io.github.suqi8.coui.kmp.basic.GlassContainer
+import io.github.suqi8.coui.kmp.basic.HighlightedIconButtonDefaults
+import io.github.suqi8.coui.kmp.basic.couiGlassSurface
+import io.github.suqi8.coui.kmp.basic.rememberGlassHighlight
+import io.github.suqi8.coui.kmp.blur.LocalBackdrop
+import io.github.suqi8.coui.kmp.blur.blur
+import io.github.suqi8.coui.kmp.blur.colorControls
+import io.github.suqi8.coui.kmp.blur.drawBackdrop
 import io.github.suqi8.coui.kmp.basic.ButtonDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.FullPagePullToRefreshTexts
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButtonDefaults
 import io.github.suqi8.coui.kmp.basic.HorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.SearchBarActionButton
@@ -206,6 +228,126 @@ fun ActionIcon(
         Icon(icon, text.ifBlank { null }, Modifier.size(17.dp), tint = color)
         if (text.isNotBlank()) {
             Text(text, fontSize = 12.sp, color = color)
+        }
+    }
+}
+
+/** 液态玻璃底色：亮底白玻璃、暗底近黑玻璃（与图片查看器控件同系）。 */
+fun glassPlate(dark: Boolean): Color =
+    if (dark) Color(0xFF141414) else Color.White
+
+/** 导航栏胶囊的底色浓度：更透一点，苹果风靠边缘和折射说话，不靠色块。 */
+fun glassPlateAlpha(dark: Boolean): Float =
+    ((if (dark) 0.32f else 0.42f) * glassAlphaFactor()).coerceIn(0.05f, 0.92f)
+
+/**
+ * 设置 → 显示与交互 → 玻璃透明度 的映射：40 = 标准（系数 1），数值越大玻璃越透。
+ * 所有玻璃件（顶栏胶囊、底栏胶囊、动作小胶囊）共用这一档。
+ */
+fun glassAlphaFactor(): Float = (1.4f - App.settings.glassAlpha / 100f).coerceIn(0.35f, 1.35f)
+
+/**
+ * 液态玻璃材质：取样 backdrop 柔化 + 提饱和（苹果 vibrancy 的手感）+ 半透明底 + 高光边。
+ * 比 COUI 默认的磨砂半透明更「透」——模糊更重、底色更淡、边缘高光更亮。
+ *
+ * couiGlassSurface 系会丢弃排在前面的 modifier，这里直接走 drawBackdrop，
+ * 尺寸 / 位置 / 内边距接在调用之后即可。
+ */
+@Composable
+fun Modifier.liquidGlass(
+    shape: Shape,
+    tint: Color,
+    alpha: Float,
+    highlightAlpha: Float = 1f,
+): Modifier {
+    val backdrop = LocalBackdrop.current
+    if (backdrop == null) return Modifier.background(tint.copy(alpha = alpha), shape)
+    val highlight = rememberGlassHighlight(GlassContainer.Small, backdrop)?.copy(alpha = highlightAlpha)
+    return Modifier
+        .drawBackdrop(
+            backdrop = backdrop,
+            shape = { shape },
+            effects = {
+                blur(44f)
+                colorControls(saturation = 1.22f)
+            },
+            highlight = { highlight },
+        )
+        .background(tint.copy(alpha = alpha), shape)
+}
+
+/**
+ * 动作玻璃小胶囊（转发 / 评论 / 点赞）：液态玻璃底 + 发丝描边 + 图标与计数，
+ * 与顶栏圆钮、底栏同属一套玻璃材质。深色下观感参考「分享 | 1136 | 10584」。
+ * 区分度靠玻璃边缘而不是加深底色——底色刻意比导航栏还透，免得比上下栏抢眼。
+ */
+@Composable
+fun GlassActionPill(
+    icon: ImageVector,
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    tint: Color = COUITheme.colorScheme.onSurfaceSecondary,
+    /** 只读流里胶囊留着给人看计数，但不响应点击。 */
+    enabled: Boolean = true,
+) {
+    val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
+    // 比导航栏更透的一档：轮廓交给高光边和发丝线；整体随「玻璃透明度」设置缩放。
+    val plateAlpha = (glassPlateAlpha(isDark) * 0.72f).coerceIn(0.04f, 0.85f)
+    val edgeColor = if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.13f)
+    val shape = RoundedCornerShape(18.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) 0.94f else 1f,
+        animationSpec = spring(dampingRatio = 0.55f, stiffness = Spring.StiffnessMediumLow),
+        label = "glassPillScale",
+    )
+    val color = if (enabled) tint else tint.copy(alpha = 0.38f)
+    Row(
+        modifier = modifier
+            .liquidGlass(
+                shape = shape,
+                tint = glassPlate(isDark),
+                alpha = plateAlpha,
+                highlightAlpha = 1f,
+            )
+            // 固定尺寸：三枚等宽，不随计数长短变形。
+            .width(96.dp)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .drawBehind {
+                // 发丝边：玻璃边缘的第二圈轮廓，白底上也要看得出形状。
+                val w = 1.dp.toPx()
+                drawRoundRect(
+                    color = edgeColor,
+                    cornerRadius = CornerRadius(18.dp.toPx() - w / 2f),
+                    style = Stroke(w),
+                    topLeft = Offset(w / 2f, w / 2f),
+                    size = Size(size.width - w, size.height - w),
+                )
+            }
+            .then(
+                if (enabled) {
+                    Modifier.clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = onClick,
+                    )
+                } else {
+                    Modifier
+                },
+            )
+            .padding(horizontal = 12.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterHorizontally),
+    ) {
+        Icon(icon, text.ifBlank { null }, Modifier.size(17.dp), tint = color)
+        if (text.isNotBlank()) {
+            Text(text, fontSize = 13.sp, fontWeight = FontWeight.Medium, color = color)
         }
     }
 }

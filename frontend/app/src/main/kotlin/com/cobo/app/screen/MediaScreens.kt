@@ -346,6 +346,8 @@ fun ImageViewerScreen(nav: NavState, urls: List<String>, index: Int) {
     val progress: () -> Float = remember(transition) { transition?.progress ?: { 1f } }
 
     var chrome by remember { mutableStateOf(true) }
+    // 下滑退出的跟手距离（px）；progress() 权重把它平滑交接给回缩略图的退场动画。
+    var dragY by remember { mutableFloatStateOf(0f) }
     var original by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
     val precise = rememberPreciseClickState()
@@ -393,6 +395,52 @@ fun ImageViewerScreen(nav: NavState, urls: List<String>, index: Int) {
             beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
+                // 下滑退出：未放大时图片随手势下沉，松手过阈值直接返回（退场动画接力收尾）。
+                .pointerInput(density) {
+                    detectVerticalDragGestures(
+                        onVerticalDrag = { _, drag ->
+                            if (!frame.zoomed) {
+                                dragY = (dragY + drag).coerceIn(0f, size.height * 0.6f)
+                            }
+                        },
+                        onDragEnd = {
+                            val passed = dragY > 120f * density
+                            if (passed) nav.pop()
+                            val from = dragY
+                            scope.launch {
+                                animate(
+                                    initialValue = from,
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.9f,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                ) { value, _ -> dragY = value }
+                            }
+                        },
+                        onDragCancel = {
+                            val from = dragY
+                            scope.launch {
+                                animate(
+                                    initialValue = from,
+                                    targetValue = 0f,
+                                    animationSpec = spring(
+                                        dampingRatio = 0.9f,
+                                        stiffness = Spring.StiffnessMediumLow,
+                                    ),
+                                ) { value, _ -> dragY = value }
+                            }
+                        },
+                    )
+                }
+                .graphicsLayer {
+                    // 跟手层：下沉 + 轻微缩小；乘 progress() 让位给回缩略图的退场。
+                    val k = progress()
+                    translationY = dragY * k
+                    val scale = (1f - dragY / (size.height * 2.2f)).coerceIn(0.85f, 1f)
+                    scaleX = scale
+                    scaleY = scale
+                }
                 .layerBackdrop(backdrop)
                 // 整层按「缩略图那一块」到「整屏」插值：缩放 + 平移 + 裁剪窗口，
                 // 于是进度 0 时正好是缩略图的居中裁切，1 时是原样铺满。

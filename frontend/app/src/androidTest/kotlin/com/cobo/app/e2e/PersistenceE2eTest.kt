@@ -54,7 +54,8 @@ class PersistenceE2eTest : UiE2eTest() {
         val before = file.lastModified()
 
         Thread.sleep(1_100)
-        tapTag("bottom_refresh")
+        // 刷新按钮已移除，手动刷新走「回顶 + 下拉」的同一管线。
+        App.requestFeedTop()
         waitUntil("手动刷新后缓存文件没有更新") { file.lastModified() > before }
     }
 }

@@ -2,9 +2,12 @@
 
 <img src="favicon.png" width="96" height="96" alt="Cobo" />
 
-# Cobo
+# Heibo
 
 **第三方微博客户端** · Kotlin + Jetpack Compose · UI 基于 COUI（ColorOS 17 设计语言）
+
+> 本仓库基于 [Costben/COBO](https://github.com/Costben/COBO) 二次开发，应用更名为 **Heibo**，
+> 在原作完整的微博功能之上重做了整套 UI 交互。原作的构建方式、功能与文档全部保留，见下文。
 
 [![Release](https://img.shields.io/github/v/release/Costben/COBO?label=release&color=1f6feb)](https://github.com/Costben/COBO/releases/latest)
 ![Android](https://img.shields.io/badge/Android-26%2B-3DDC84?logo=android&logoColor=white)
@@ -24,6 +27,37 @@
 <div align="center"><sub>信息流 · 详情页 · 长按玻璃菜单 · 图片查看器</sub></div>
 
 ---
+
+## 相比原仓库的改动
+
+在 [Costben/COBO](https://github.com/Costben/COBO) 完整功能的基础上，围绕 **液态玻璃（Liquid Glass）**
+设计语言重做了 UI 与交互，并同步了原仓库 1.0.21 的新功能（微博投票、分类胶囊动效）。
+
+**视觉**
+
+- 顶栏改为单行悬浮件：搜索（左）· 分段胶囊（中）· 发布（右），去掉标题文字与上滑时的大面积模糊带
+- 底部导航改为液态玻璃悬浮胶囊，去掉刷新 / 发布圆钮（刷新走下拉，发布移到顶栏）
+- 微博卡片动作（转发 / 评论 / 点赞）改为居中的玻璃小胶囊，固定尺寸、两端对齐图片边缘
+- 全套玻璃材质支持「玻璃透明度」调节（轻透磨砂 ↔ 柔光玻璃），亮暗双套基准浓度
+- 强调蓝整体调灰，话题 / @ / 链接去下划线，黑白正文上更协调
+
+**信息流与详情**
+
+- 卡片信息整合：时间 / 机型 / IP 合并到昵称下方；时间规则为「刚刚 / X分钟前 / 今天 18:43」
+- 展开动画保持原样，返回动画重做（识别按钮返回的瞬移路径、补全被截短的行程）
+- 评论区：头像 / 昵称可点进主页；整条评论可点回复；楼中楼去掉缩小的回复按钮，点赞按钮统一尺寸、右对齐并按层级淡化
+- 「全部」分类两段式：先选中、再点才弹筛选菜单
+
+**功能**
+
+- 分享面板：复制全文 / 复制链接 / 生成图片（含头像、昵称、原文与二维码）/ 私信好友（按关注头像选人）/ 系统分享
+- 图片浏览器支持下滑退出
+- 设置新增：外观模式三选一（跟随系统 / 浅色 / 深色）、字号滑杆、玻璃透明度
+- 「我」页标题随滚动上滑隐藏；分享卡片与相册目录品牌更新为 Heibo
+
+**品牌**
+
+- 新图标（黑柴犬）与应用名 **Heibo**，主题图标（单色）同步适配
 
 ## 特性
 
@@ -55,7 +89,7 @@
 | 项 | 值 |
 | :--- | :--- |
 | applicationId | `com.cobo.app` |
-| 应用名 | Cobo |
+| 应用名 | Heibo |
 | 版本 | 1.0.0（versionCode 10000） |
 | minSdk / targetSdk | 26 / 37 |
 | 工程 | `frontend/`（独立 Gradle 工程） |

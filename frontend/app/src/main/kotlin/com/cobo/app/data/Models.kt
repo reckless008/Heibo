@@ -559,6 +559,11 @@ data class Session(val cookie: String, val uid: String, val savedAt: Long)
 
 data class Config(val uid: String, val st: String, val loggedIn: Boolean)
 
+/**
+ * 时间显示规则：与当前同一分钟显示「刚刚」；30 分钟及以内显示「X分钟前」；
+ * 30 分钟以上显示具体发布时间——今天/昨天带前缀（「今天 18:43」「昨天 21:07」），
+ * 更早的显示「MM-dd HH:mm」，跨年显示「yyyy-MM-dd HH:mm」。
+ */
 fun formatWeiboTime(raw: String?): String {
     if (raw.isNullOrBlank()) return ""
     val millis = runCatching {
@@ -567,14 +572,23 @@ fun formatWeiboTime(raw: String?): String {
 
     val diff = System.currentTimeMillis() - millis
     if (diff < 60_000L) return "刚刚"
-    if (diff < 3_600_000L) return "${diff / 60_000L}分钟前"
-    if (diff < 86_400_000L) return "${diff / 3_600_000L}小时前"
+    if (diff <= 30 * 60_000L) return "${diff / 60_000L}分钟前"
+
     val date = Date(millis)
     val now = Date()
-    val pattern = if (SimpleDateFormat("yyyy", Locale.US).format(date) ==
-        SimpleDateFormat("yyyy", Locale.US).format(now)
-    ) "MM-dd" else "yyyy-MM-dd"
-    return SimpleDateFormat(pattern, Locale.US).format(date)
+    val sameDay = SimpleDateFormat("yyyyMMdd", Locale.US).format(date) ==
+        SimpleDateFormat("yyyyMMdd", Locale.US).format(now)
+    val yesterday = SimpleDateFormat("yyyyMMdd", Locale.US).format(Date(millis + 86_400_000L)) ==
+        SimpleDateFormat("yyyyMMdd", Locale.US).format(now)
+    val clock = SimpleDateFormat("HH:mm", Locale.US).format(date)
+    return when {
+        sameDay -> "今天 $clock"
+        yesterday -> "昨天 $clock"
+        SimpleDateFormat("yyyy", Locale.US).format(date) ==
+            SimpleDateFormat("yyyy", Locale.US).format(now) ->
+            SimpleDateFormat("MM-dd HH:mm", Locale.US).format(date)
+        else -> SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.US).format(date)
+    }
 }
 
 fun parseCards(root: JSONObject?): FeedPage {

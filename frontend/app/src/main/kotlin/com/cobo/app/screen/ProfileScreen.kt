@@ -211,6 +211,8 @@ fun ProfileContent(
     modifier: Modifier = Modifier,
     topInset: Dp = 0.dp,
     extraBottom: Dp = 0.dp,
+    /** 「我」页顶栏标题的折叠量：列表上滑多少报多少，滚过首项后给一个大哨兵值。 */
+    onScrollOffset: (Float) -> Unit = {},
 ) {
     val scope = rememberCoroutineScope()
     var user by remember(uid) { mutableStateOf<User?>(null) }
@@ -223,6 +225,13 @@ fun ProfileContent(
     var resolvedUid by remember(uid) { mutableStateOf<String?>(uid) }
     val listState = rememberLazyListState()
     val pullState = rememberFullPagePullToRefreshState()
+
+    LaunchedEffect(listState) {
+        snapshotFlow {
+            if (listState.firstVisibleItemIndex > 0) Float.MAX_VALUE
+            else listState.firstVisibleItemScrollOffset.toFloat()
+        }.collect { onScrollOffset(it) }
+    }
 
     // showRefresh 只给用户主动刷新用：进入页面时的静默加载不驱动下拉动画。
     suspend fun loadStatuses(reset: Boolean, force: Boolean = false, showRefresh: Boolean = false) {

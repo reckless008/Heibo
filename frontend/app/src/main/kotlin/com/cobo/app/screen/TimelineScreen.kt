@@ -205,22 +205,12 @@ fun TimelineScreen(
     followStore: FeedStore,
     recommendStore: FeedStore,
     topInset: Dp,
-    onScrollOffset: (Float) -> Unit,
 ) {
     // The list states live here so the bottom accessory can send every page back to the top.
     val listStates = remember(stores.size) { List(stores.size) { LazyListState() } }
     val refreshScope = rememberCoroutineScope()
     val pullStates = remember(stores.size) {
         mutableStateListOf<FullPagePullToRefreshState?>().apply { repeat(stores.size) { add(null) } }
-    }
-    // The header folds its title row away one pixel per pixel scrolled; past the first item the
-    // row is already gone, so a large sentinel collapses it fully.
-    LaunchedEffect(pagerState, listStates) {
-        snapshotFlow {
-            val state = listStates.getOrNull(pagerState.currentPage) ?: return@snapshotFlow 0f
-            if (state.firstVisibleItemIndex > 0) Float.MAX_VALUE
-            else state.firstVisibleItemScrollOffset.toFloat()
-        }.collect { onScrollOffset(it) }
     }
     val currentFollowStore by rememberUpdatedState(followStore)
     val currentStores by rememberUpdatedState(stores)
@@ -316,7 +306,7 @@ private fun TimelinePage(
                 start = 12.dp,
                 top = topInset + 16.dp,
                 end = 12.dp,
-                bottom = 66.dp + navBottomPadding(),
+                bottom = 78.dp + navBottomPadding(),
             ),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {

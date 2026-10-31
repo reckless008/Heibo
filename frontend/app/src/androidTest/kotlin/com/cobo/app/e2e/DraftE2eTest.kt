@@ -29,7 +29,7 @@ class DraftE2eTest : UiE2eTest() {
     fun draft_savedOnLeave_restoredAndDeleted() {
         val text = "E2E 草稿 ${System.currentTimeMillis()}"
         try {
-            tapTag("bottom_publish")
+            tapTag("top_publish")
             waitText("发微博")
 
             val input = waitTag("publish_input")

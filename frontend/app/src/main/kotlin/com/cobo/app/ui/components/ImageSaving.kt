@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import android.net.Uri
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -107,7 +108,7 @@ suspend fun saveToGallery(context: Context, bytes: ByteArray, url: String): Bool
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     put(
                         MediaStore.Images.Media.RELATIVE_PATH,
-                        Environment.DIRECTORY_PICTURES + "/Cobo",
+                        Environment.DIRECTORY_PICTURES + "/Heibo",
                     )
                     put(MediaStore.Images.Media.IS_PENDING, 1)
                 }
@@ -122,6 +123,37 @@ suspend fun saveToGallery(context: Context, bytes: ByteArray, url: String): Bool
             }
             true
         }.getOrDefault(false)
+    }
+
+/**
+ * 分享卡片出图：写入相册并把内容 Uri 交回调用方（分享面板用它发起系统分享）。
+ */
+suspend fun saveShareImage(context: Context, bytes: ByteArray): Uri? =
+    withContext(Dispatchers.IO) {
+        runCatching {
+            val name = "cobo_share_${System.currentTimeMillis()}.png"
+            val resolver = context.contentResolver
+            val values = ContentValues().apply {
+                put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    put(
+                        MediaStore.Images.Media.RELATIVE_PATH,
+                        Environment.DIRECTORY_PICTURES + "/Heibo",
+                    )
+                    put(MediaStore.Images.Media.IS_PENDING, 1)
+                }
+            }
+            val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                ?: return@runCatching null
+            resolver.openOutputStream(uri)?.use { it.write(bytes) } ?: return@runCatching null
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.clear()
+                values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                resolver.update(uri, values, null, null)
+            }
+            uri
+        }.getOrNull()
     }
 
 /**

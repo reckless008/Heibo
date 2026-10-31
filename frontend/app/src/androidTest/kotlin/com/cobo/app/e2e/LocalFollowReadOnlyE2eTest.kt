@@ -21,7 +21,7 @@ class LocalFollowReadOnlyE2eTest : UiE2eTest() {
     fun localFollowDetail_isReadOnly_otherFeedsAreNot() {
         assumeTrue("本机没有打「本地」标记", FollowTags.uids(FollowTag.Local).isNotEmpty())
 
-        tapTag("feed_tab_follow")
+        openFollowFilterMenu()
         clickText("本地关注")
         waitTag("feed_page_1")
         waitTag("feed_card_0")

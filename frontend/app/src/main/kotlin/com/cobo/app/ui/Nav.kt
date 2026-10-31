@@ -36,7 +36,12 @@ import kotlinx.coroutines.launch
 
 val ExpandEasing = CubicBezierEasing(0.3f, 0f, 0.1f, 1f)
 const val ExpandEnterMillis = 420
-const val ExpandExitMillis = 220
+
+/**
+ * 返回与进场对称（420/400）：普通返回走完整行程，没有手势落点压缩，
+ * 时长太短仍会读成「啪一下收掉」。曲线与进场同一条 [ExpandEasing]。
+ */
+const val ExpandExitMillis = 400
 const val RouteSlideMillis = 320
 const val RouteParallaxDivisor = 4f
 
@@ -256,17 +261,14 @@ class NavState {
                 launch {
                     entry.progress.animateTo(
                         targetValue = 0f,
-                        animationSpec = tween(
-                            millis,
-                            easing = if (expand) LinearEasing else ExpandEasing,
-                        ),
+                        animationSpec = tween(millis, easing = ExpandEasing),
                     )
                 }
                 if (expand) {
                     launch {
                         entry.fade.animateTo(
                             targetValue = 0f,
-                            animationSpec = tween(millis, easing = LinearEasing),
+                            animationSpec = tween(millis, easing = ExpandEasing),
                         )
                     }
                 }
