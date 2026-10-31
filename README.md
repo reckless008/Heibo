@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="favicon.png" width="96" height="96" alt="Cobo" />
+<img src="favicon.png" width="96" height="96" alt="Heibo" />
 
 # Heibo
 
@@ -9,7 +9,7 @@
 > 本仓库基于 [Costben/COBO](https://github.com/Costben/COBO) 二次开发，应用更名为 **Heibo**，
 > 在原作完整的微博功能之上重做了整套 UI 交互。原作的构建方式、功能与文档全部保留，见下文。
 
-[![Release](https://img.shields.io/github/v/release/Costben/COBO?label=release&color=1f6feb)](https://github.com/Costben/COBO/releases/latest)
+[![Release](https://img.shields.io/github/v/release/reckless008/Heibo?label=release&color=1f6feb)](https://github.com/reckless008/Heibo/releases/latest)
 ![Android](https://img.shields.io/badge/Android-26%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Compose-1.11-4285F4?logo=jetpackcompose&logoColor=white)
@@ -18,13 +18,14 @@
 </div>
 
 <div align="center">
-  <img src="docs/images/feed.jpg" width="23%" alt="信息流" />
-  <img src="docs/images/detail.jpg" width="23%" alt="详情页" />
-  <img src="docs/images/menu.jpg" width="23%" alt="长按菜单" />
-  <img src="docs/images/viewer.jpg" width="23%" alt="图片查看器" />
+  <img src="docs/images/heibo-feed.jpg" width="18%" alt="信息流" />
+  <img src="docs/images/heibo-detail.jpg" width="18%" alt="详情评论" />
+  <img src="docs/images/heibo-share.jpg" width="18%" alt="分享面板" />
+  <img src="docs/images/heibo-settings.jpg" width="18%" alt="设置" />
+  <img src="docs/images/heibo-profile.jpg" width="18%" alt="个人主页" />
 </div>
 
-<div align="center"><sub>信息流 · 详情页 · 长按玻璃菜单 · 图片查看器</sub></div>
+<div align="center"><sub>信息流 · 详情评论 · 分享面板 · 设置 · 个人主页</sub></div>
 
 ---
 
