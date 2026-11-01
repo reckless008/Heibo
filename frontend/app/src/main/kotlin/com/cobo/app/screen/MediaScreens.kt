@@ -80,6 +80,7 @@ import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size as ComposeSize
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.GraphicsLayerScope
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.RectangleShape
@@ -126,10 +127,11 @@ import com.cobo.app.ui.LocalImageOrigins
 import com.cobo.app.ui.LocalRouteTransition
 import com.cobo.app.ui.NavState
 import com.cobo.app.ui.ThumbBounds
+import com.cobo.app.ui.components.GlassIconButton
+import com.cobo.app.ui.components.glassEdgeLight
 import com.cobo.app.ui.components.SaveImagesMenu
 import com.cobo.app.ui.components.originalSize
 import com.cobo.app.ui.components.rememberImageSaveState
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.GlassContainer
 import io.github.suqi8.coui.kmp.basic.couiGlassSurface
 import io.github.suqi8.coui.kmp.basic.rememberGlassHighlight
@@ -305,6 +307,7 @@ private fun Modifier.viewerGlass(
     container: GlassContainer = GlassContainer.Small,
 ): Modifier {
     val backdrop = LocalBackdrop.current
+    // 边缘光影与全站玻璃同源（glassEdgeLight），让查看器控件与导航玻璃读作同一套材质。
     return couiGlassSurface(
         backdrop = backdrop,
         shape = shape,
@@ -312,7 +315,7 @@ private fun Modifier.viewerGlass(
         fallback = Modifier.background(tint.copy(alpha = alpha), shape),
         containerAlpha = alpha,
         highlight = rememberGlassHighlight(container, backdrop),
-    )
+    ).glassEdgeLight(tint.luminance() < 0.5f)
 }
 
 @Composable
@@ -1180,7 +1183,7 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HighlightedIconButton(onClick = { nav.pop() }) {
+            GlassIconButton(onClick = { nav.pop() }) {
                 Icon(COUIIcons.Close, "关闭", Modifier, tint = Color.White)
             }
             Text(title, color = Color.White, fontSize = 14.sp, maxLines = 1)

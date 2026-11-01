@@ -88,6 +88,7 @@ import com.cobo.app.ui.CoboIcons
 import com.cobo.app.data.User
 import com.cobo.app.ui.components.ActionIcon
 import com.cobo.app.ui.components.GlassActionPill
+import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.Avatar
 import com.cobo.app.ui.components.BackIconButton
 import com.cobo.app.ui.components.ErrorState
@@ -102,7 +103,6 @@ import com.cobo.app.ui.components.navBottomPadding
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlay
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
 import io.github.suqi8.coui.kmp.basic.Card
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
 import io.github.suqi8.coui.kmp.basic.Text
@@ -483,7 +483,7 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
                         gradientGlass = false,
                         navigationIcon = { BackIconButton { nav.pop() } },
                         actions = {
-                            HighlightedIconButton(
+                            GlassIconButton(
                                 onClick = { showShare = true },
                                 modifier = Modifier.couiTopAppBarActionItem().testTag("detail_share"),
                             ) {

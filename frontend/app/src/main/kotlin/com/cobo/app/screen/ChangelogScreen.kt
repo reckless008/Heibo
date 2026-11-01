@@ -33,13 +33,13 @@ import com.cobo.app.data.Updater
 import com.cobo.app.ui.NavState
 import com.cobo.app.ui.PinnedBarDensity
 import com.cobo.app.ui.components.BackIconButton
+import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.ErrorState
 import com.cobo.app.ui.components.LoadingState
 import com.cobo.app.ui.components.MarkdownText
 import com.cobo.app.ui.components.navBottomPadding
 import com.cobo.app.ui.pageContainerColor
 import io.github.suqi8.coui.kmp.basic.Card
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Scaffold
 import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
@@ -81,7 +81,7 @@ fun ChangelogScreen(nav: NavState) {
                     title = "更新日志",
                     navigationIcon = { BackIconButton { nav.pop() } },
                     actions = {
-                        HighlightedIconButton(
+                        GlassIconButton(
                             onClick = { reload++ },
                             modifier = Modifier.couiTopAppBarActionItem().testTag("changelog_reload"),
                         ) {

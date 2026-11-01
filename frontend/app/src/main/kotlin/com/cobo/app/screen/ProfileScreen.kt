@@ -63,6 +63,8 @@ import com.cobo.app.ui.Route
 import com.cobo.app.ui.expandOrigin
 import com.cobo.app.ui.components.Avatar
 import com.cobo.app.ui.components.BackIconButton
+import com.cobo.app.ui.components.GlassIconButton
+import com.cobo.app.ui.components.glassLens
 import com.cobo.app.ui.components.EmptyState
 import com.cobo.app.ui.components.ErrorState
 import com.cobo.app.ui.components.FollowTagBadge
@@ -75,7 +77,6 @@ import com.cobo.app.ui.components.navBottomPadding
 import com.cobo.app.ui.components.fmtCount
 import io.github.suqi8.coui.kmp.basic.DropdownImpl
 import io.github.suqi8.coui.kmp.basic.DropdownItem
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.ListPopupColumn
 import io.github.suqi8.coui.kmp.basic.ListPopupDefaults
 import io.github.suqi8.coui.kmp.basic.FullPagePullToRefresh
@@ -108,7 +109,6 @@ import io.github.suqi8.coui.kmp.basic.FullPageRefreshState
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButtonDefaults
 import io.github.suqi8.coui.kmp.basic.LocalEdgeToEdge
 import io.github.suqi8.coui.kmp.basic.TopAppBarDefaults
-import io.github.suqi8.coui.kmp.basic.materialShadowEdge
 import io.github.suqi8.coui.kmp.basic.rememberFullPagePullToRefreshState
 import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
@@ -160,7 +160,7 @@ fun ProfileScreen(nav: NavState, uid: String?) {
 private fun ProfileMoreAction(tag: FollowTag?, onSelect: (FollowTag?) -> Unit) {
     var expanded by remember { mutableStateOf(false) }
     Box {
-        HighlightedIconButton(
+        GlassIconButton(
             onClick = { expanded = true },
             modifier = Modifier.couiTopAppBarActionItem().testTag("profile_more"),
         ) {
@@ -424,8 +424,8 @@ private val ProfileAvatarRing = 68.dp
 private val CoverDivider = 0.5.dp
 
 /**
- * 关注按钮：顶栏返回键 / 三点键那颗 [HighlightedIconButton] 的材质拉成胶囊 —— 同样的半透明
- * 径向填充、材质描边和按下回弹缩放，只是形状换成能放下文字的胶囊。
+ * 关注按钮：与顶栏玻璃圆钮同一套玻璃透镜材质拉成胶囊 —— 同样的半透填充、受光折射边和按下回弹缩放，
+ * 只是形状换成能放下文字的胶囊。
  */
 @Composable
 private fun FollowCapsule(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -438,7 +438,6 @@ private fun FollowCapsule(text: String, onClick: () -> Unit, modifier: Modifier 
         animationSpec = HighlightedIconButtonDefaults.PressSpring,
         label = "followPress",
     )
-    val brighten = HighlightedIconButtonDefaults.PressedFillBrighten * press
     Box(
         modifier = modifier
             .height(36.dp)
@@ -448,24 +447,7 @@ private fun FollowCapsule(text: String, onClick: () -> Unit, modifier: Modifier 
                 scaleY = scale
             }
             .clip(CircleShape)
-            .drawBehind {
-                drawRect(
-                    Brush.radialGradient(
-                        colorStops = arrayOf(
-                            0f to lerp(HighlightedIconButtonDefaults.fillCenter(isDark), Color.White, brighten)
-                                .copy(alpha = HighlightedIconButtonDefaults.FillAlpha),
-                            HighlightedIconButtonDefaults.FillEdgeStop to lerp(
-                                HighlightedIconButtonDefaults.fillEdge(isDark),
-                                Color.White,
-                                brighten,
-                            ).copy(alpha = HighlightedIconButtonDefaults.FillAlpha),
-                        ),
-                        center = center,
-                        radius = size.maxDimension / 2f,
-                    ),
-                )
-            }
-            .materialShadowEdge(stroke = HighlightedIconButtonDefaults.stroke(isDark))
+            .glassLens(CircleShape, isDark, shadowElevation = 2.dp)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

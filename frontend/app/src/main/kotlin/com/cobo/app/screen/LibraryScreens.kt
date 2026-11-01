@@ -54,6 +54,7 @@ import com.cobo.app.ui.pinnedHeight
 import com.cobo.app.ui.Route
 import com.cobo.app.ui.components.Avatar
 import com.cobo.app.ui.components.BackIconButton
+import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.ConfirmDialog
 import com.cobo.app.ui.components.EmptyState
 import com.cobo.app.ui.components.TopBarTextButton
@@ -63,7 +64,6 @@ import com.cobo.app.ui.components.navBottomPadding
 import com.cobo.app.ui.pageContainerColor
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.CardDefaults
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.InputField
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.LocalEdgeToEdge
@@ -140,7 +140,7 @@ fun DraftsScreen(nav: NavState) {
                             color = COUITheme.colorScheme.onSurfaceSecondary,
                             modifier = Modifier.weight(1f),
                         )
-                        HighlightedIconButton(
+                        GlassIconButton(
                             onClick = {
                                 App.store.removeDraft(draft.time)
                                 drafts = App.store.drafts()
@@ -279,7 +279,7 @@ fun HistoryScreen(nav: NavState) {
                     navigationIcon = { BackIconButton { nav.pop() } },
                     actions = {
                         if (history.isNotEmpty()) {
-                            HighlightedIconButton(
+                            GlassIconButton(
                                 onClick = {
                                     filterOpen = !filterOpen
                                     if (!filterOpen) query = ""
@@ -404,7 +404,7 @@ fun AccountsScreen(nav: NavState) {
                     title = "账号管理",
                     navigationIcon = { BackIconButton { nav.pop() } },
                     actions = {
-                        HighlightedIconButton(onClick = {
+                        GlassIconButton(onClick = {
                             nav.push(Route.Login(addAccount = true, fresh = true))
                         }) {
                             Icon(COUIIcons.Add, "添加账号", Modifier.size(24.dp))

@@ -84,6 +84,7 @@ import com.cobo.app.screen.ProfileContent
 import com.cobo.app.screen.TimelineScreen
 import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.GlassPillButton
+import com.cobo.app.ui.components.glassEdgeLight
 import com.cobo.app.ui.components.glassPlate
 import com.cobo.app.ui.components.glassPlateAlpha
 import com.cobo.app.ui.components.liquidGlass
@@ -793,45 +794,7 @@ private fun FeedTabs(
                 .clip(CouiSegmentCapsuleShape)
                 // 与底栏同一套玻璃透镜：亮一档的半透玻璃 + 受光边，而非白色实心块。
                 .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
-                .drawBehind {
-                    val w = 1.dp.toPx()
-                    val r = size.height / 2f
-                    // 亮发丝边（顶部受光）。
-                    drawRoundRect(
-                        color = if (dark) Color.White.copy(alpha = 0.32f)
-                        else Color.White.copy(alpha = 0.9f),
-                        cornerRadius = CornerRadius(r - w / 2f),
-                        style = Stroke(w),
-                        topLeft = Offset(w / 2f, w / 2f),
-                        size = Size(size.width - w, size.height - w),
-                    )
-                    // 顶部高光带（光效）。
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (dark) 0.24f else 0.55f),
-                                Color.White.copy(alpha = 0f),
-                            ),
-                            startY = 0f,
-                            endY = size.height * 0.5f,
-                        ),
-                    )
-                    // 底缘暗折边：向下渐显，只咬住下缘，不盖顶部亮边。
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = if (dark) 0.18f else 0.07f),
-                            ),
-                            startY = 0f,
-                            endY = size.height,
-                        ),
-                        cornerRadius = CornerRadius(r - w / 2f),
-                        style = Stroke(w),
-                        topLeft = Offset(w / 2f, w / 2f),
-                        size = Size(size.width - w, size.height - w),
-                    )
-                }
+                .glassEdgeLight(dark)
                 .shadow(
                     elevation = 3.dp,
                     shape = RoundedCornerShape(18.dp),
@@ -1056,45 +1019,7 @@ private fun FloatingBottomBar(
                         // 玻璃透镜：同为玻璃材质、但比容器亮一档——层级来自材质厚度（Apple §12），
                         // 不是白色实心块；配合受光边与投影，读作「浮在玻璃里的一枚镜片」。
                         .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
-                .drawBehind {
-                    val w = 1.dp.toPx()
-                    val r = size.height / 2f
-                    // 亮发丝边（顶部受光）。
-                    drawRoundRect(
-                        color = if (dark) Color.White.copy(alpha = 0.32f)
-                        else Color.White.copy(alpha = 0.9f),
-                        cornerRadius = CornerRadius(r - w / 2f),
-                        style = Stroke(w),
-                        topLeft = Offset(w / 2f, w / 2f),
-                        size = Size(size.width - w, size.height - w),
-                    )
-                    // 顶部高光带（光效）。
-                    drawRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.White.copy(alpha = if (dark) 0.24f else 0.55f),
-                                Color.White.copy(alpha = 0f),
-                            ),
-                            startY = 0f,
-                            endY = size.height * 0.5f,
-                        ),
-                    )
-                    // 底缘暗折边：向下渐显，只咬住下缘，不盖顶部亮边。
-                    drawRoundRect(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                Color.Transparent,
-                                Color.Black.copy(alpha = if (dark) 0.18f else 0.07f),
-                            ),
-                            startY = 0f,
-                            endY = size.height,
-                        ),
-                        cornerRadius = CornerRadius(r - w / 2f),
-                        style = Stroke(w),
-                        topLeft = Offset(w / 2f, w / 2f),
-                        size = Size(size.width - w, size.height - w),
-                    )
-                }
+                        .glassEdgeLight(dark)
                         .shadow(
                             elevation = 3.dp,
                             shape = RoundedCornerShape(23.dp),

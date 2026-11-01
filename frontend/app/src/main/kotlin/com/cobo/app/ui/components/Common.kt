@@ -65,10 +65,8 @@ import io.github.suqi8.coui.kmp.blur.drawBackdrop
 import io.github.suqi8.coui.kmp.basic.ButtonDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.FullPagePullToRefreshTexts
-import io.github.suqi8.coui.kmp.basic.HighlightedIconButton
 import io.github.suqi8.coui.kmp.basic.HorizontalDivider
 import io.github.suqi8.coui.kmp.basic.Icon
-import io.github.suqi8.coui.kmp.basic.SearchBarActionButton
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
 import io.github.suqi8.coui.kmp.icon.COUIIcons
@@ -236,7 +234,72 @@ fun ActionIcon(
 }
 
 /**
- * 玻璃透镜：亮一档的半透玻璃 + 受光发丝边 + 顶部高光 + 底缘暗折边（可选投影）。
+ * 玻璃边缘光影：方向性受光发丝边 + 冷暖色散折射内边 + 顶部高光带 + 底缘暗折边。
+ * 所有玻璃件（透镜、指示块、查看器控件）共用这一圈绘制——边缘光影是玻璃与背景的区分度来源。
+ */
+fun Modifier.glassEdgeLight(dark: Boolean): Modifier = this.drawBehind {
+        val w = 1.dp.toPx()
+        val r = size.minDimension / 2f
+        fun edge(inset: Float, brush: Brush) {
+            drawRoundRect(
+                brush = brush,
+                cornerRadius = CornerRadius(r - inset - w / 2f),
+                style = Stroke(w),
+                topLeft = Offset(inset + w / 2f, inset + w / 2f),
+                size = Size(size.width - 2 * inset - w, size.height - 2 * inset - w),
+            )
+        }
+        // 外缘：方向性受光——顶亮底暗的发丝边（光从上方来）。
+        edge(
+            0f,
+            Brush.verticalGradient(
+                colors = listOf(
+                    if (dark) Color.White.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.95f),
+                    if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
+                ),
+                startY = 0f,
+                endY = size.height,
+            ),
+        )
+        // 内缘：色散折射——冷暖各一丝的第二道光边，模拟厚玻璃边缘的折光。
+        edge(
+            1.6.dp.toPx(),
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFA8C8FF).copy(alpha = if (dark) 0.16f else 0.22f),
+                    Color(0xFFFFD9A8).copy(alpha = if (dark) 0.12f else 0.18f),
+                ),
+                startY = 0f,
+                endY = size.height,
+            ),
+        )
+        // 顶部高光带（光效）。
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = if (dark) 0.26f else 0.6f),
+                    Color.White.copy(alpha = 0f),
+                ),
+                startY = 0f,
+                endY = size.height * 0.5f,
+            ),
+        )
+        // 底缘暗折边：向下渐显，只咬住下缘。
+        edge(
+            0f,
+            Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    Color.Black.copy(alpha = if (dark) 0.2f else 0.08f),
+                ),
+                startY = size.height * 0.45f,
+                endY = size.height,
+            ),
+        )
+}
+
+/**
+ * 玻璃透镜：亮一档的半透玻璃 + [glassEdgeLight] 边缘光影（可选投影）。
  * 底栏 / 顶栏选中块 / 玻璃圆钮共用这一套绘制——层级来自材质厚度，不是颜色。
  */
 fun Modifier.glassLens(
@@ -245,50 +308,12 @@ fun Modifier.glassLens(
     shadowElevation: Dp = 3.dp,
 ): Modifier = this
     .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
-    .drawBehind {
-        val w = 1.dp.toPx()
-        val r = size.minDimension / 2f
-        // 亮发丝边（顶部受光）。
-        drawRoundRect(
-            color = if (dark) Color.White.copy(alpha = 0.32f)
-            else Color.White.copy(alpha = 0.9f),
-            cornerRadius = CornerRadius(r - w / 2f),
-            style = Stroke(w),
-            topLeft = Offset(w / 2f, w / 2f),
-            size = Size(size.width - w, size.height - w),
-        )
-        // 顶部高光带（光效）。
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = if (dark) 0.24f else 0.55f),
-                    Color.White.copy(alpha = 0f),
-                ),
-                startY = 0f,
-                endY = size.height * 0.5f,
-            ),
-        )
-        // 底缘暗折边：向下渐显，只咬住下缘，不盖顶部亮边。
-        drawRoundRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    Color.Black.copy(alpha = if (dark) 0.18f else 0.07f),
-                ),
-                startY = 0f,
-                endY = size.height,
-            ),
-            cornerRadius = CornerRadius(r - w / 2f),
-            style = Stroke(w),
-            topLeft = Offset(w / 2f, w / 2f),
-            size = Size(size.width - w, size.height - w),
-        )
-    }
+    .glassEdgeLight(dark)
     .shadow(
         elevation = shadowElevation,
         shape = shape,
-        ambientColor = Color.Black.copy(alpha = 0.14f),
-        spotColor = Color.Black.copy(alpha = 0.18f),
+        ambientColor = Color.Black.copy(alpha = 0.16f),
+        spotColor = Color.Black.copy(alpha = 0.2f),
     )
 
 /**
@@ -445,6 +470,7 @@ fun GlassActionPill(
 ) {
     val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
     // 比导航栏更透的一档：轮廓交给高光边和发丝线；整体随「玻璃透明度」设置缩放。
+    // 小胶囊不适合玻璃透镜材质（用户要求），保持液态玻璃底 + 发丝描边。
     val plateAlpha = (glassPlateAlpha(isDark) * 0.72f).coerceIn(0.04f, 0.85f)
     val edgeColor = if (isDark) Color.White.copy(alpha = 0.22f) else Color.Black.copy(alpha = 0.13f)
     val shape = RoundedCornerShape(18.dp)
@@ -505,11 +531,7 @@ fun GlassActionPill(
 }
 
 /**
- * 顶栏文字按钮：高度与 [BackIconButton] 的正圆一致（40dp）。
- *
- * 复用搜索栏「取消」那个 [SearchBarActionButton] 的形状与光效——同一份胶囊、同一圈焦散外光
- * （裁在胶囊外侧，不会照亮内部）、同一套按下动效。底色换成 [HighlightedIconButton] 圆形材质的
- * 那份取样色：两者在顶栏左右并排时深度一致，不会一边深一边浅。
+ * 顶栏文字按钮：高度与 [BackIconButton] 的正圆一致（40dp），与 [GlassPillButton] 同一套玻璃胶囊材质。
  */
 @Composable
 fun TopBarTextButton(
@@ -518,25 +540,15 @@ fun TopBarTextButton(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    SearchBarActionButton(
-        text = text,
-        onClick = onClick,
-        modifier = modifier,
-        enabled = enabled,
-        containerColor = toolbarMaterialFill(),
-    )
+    GlassPillButton(text = text, onClick = onClick, modifier = modifier, enabled = enabled)
 }
 
-/** 顶栏材质底色：和返回键的圆形底同一份材质，取它中心那一档。 */
-@Composable
-private fun toolbarMaterialFill(): Color =
-    // 圆形底是中心深、边沿浅的径向渐变，眼睛读的是它中间那一片；胶囊铺平取中心色，并排时看着一样深。
-    HighlightedIconButtonDefaults.fillCenter(COUITheme.colorScheme.background.luminance() < 0.5f)
-        .copy(alpha = HighlightedIconButtonDefaults.FillAlpha)
-
+/**
+ * 返回键：与顶栏搜索 / 发布同一套玻璃圆钮材质，替换 COUI 的亮面径向渐变圆钮。
+ */
 @Composable
 fun BackIconButton(onClick: () -> Unit) {
-    HighlightedIconButton(onClick = onClick) {
+    GlassIconButton(onClick = onClick) {
         Icon(COUIIcons.Back, "返回", Modifier.size(24.dp))
     }
 }

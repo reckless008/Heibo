@@ -404,7 +404,7 @@ fun SettingsScreen(nav: NavState) {
                     ArrowPreference(
                         title = "关于",
                         modifier = Modifier.testTag("settings_about"),
-                        summary = "Heibo · COUI 前端",
+                        summary = "Heibo · 第三方微博客户端",
                         cardListPosition = CardListPosition.Tail,
                         onClick = { about = true },
                     )
@@ -453,7 +453,7 @@ fun SettingsScreen(nav: NavState) {
 
             item {
                 Text(
-                    "基于 m.weibo.cn Web API 的第三方微博客户端。\n仅用于个人学习与研究。",
+                    "Heibo · 基于 m.weibo.cn Web API 的第三方微博客户端。\n仅用于个人学习与研究。",
                     fontSize = 11.sp,
                     lineHeight = 16.sp,
                     color = COUITheme.colorScheme.onSurfaceSecondary,
@@ -484,7 +484,7 @@ fun SettingsScreen(nav: NavState) {
     if (about) {
         ConfirmDialog(
             title = "关于 Heibo",
-            message = "Heibo · COUI 前端 v$version\n\n使用 COUI（ColorOS 17 设计语言）重建的第三方微博客户端。\n仅用于个人学习与研究。",
+            message = "Heibo v$version\n\n基于 m.weibo.cn Web API 的第三方微博客户端，基于 COUI（ColorOS 17 设计语言）重做整套界面与交互。\n仅用于个人学习与研究。",
             confirmText = "知道了",
             onDismiss = { about = false },
             onConfirm = { about = false },
