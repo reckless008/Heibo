@@ -959,7 +959,8 @@ private fun FloatingBottomBar(
             val barH = with(density) { GlassBarHeight.toPx() }
             val itemW = constraints.maxWidth / 3f
             val indicatorW = itemW - with(density) { 20.dp.toPx() }
-            val indicatorH = with(density) { 38.dp.toPx() }
+            // 透镜高度包住「图标 + 标签」整组（44dp 内容 + 余量）。
+            val indicatorH = with(density) { 46.dp.toPx() }
             val centerForIndex = { i: Int -> itemW / 2f + i * itemW }
             val motion = remember {
                 CouiSegmentIndicatorMotion(
@@ -1004,37 +1005,45 @@ private fun FloatingBottomBar(
                             width = with(density) { motion.width.toDp() },
                             height = with(density) { motion.height.toDp() },
                         )
-                        .clip(RoundedCornerShape(19.dp))
-                        // 小胶囊比容器实一档，读作「浮在大胶囊里的选中块」（顶栏同款层次）。
-                        .background(if (dark) Color(0x66FFFFFF) else Color(0xF0FAFAFD))
+                        .clip(RoundedCornerShape(23.dp))
+                        // 玻璃透镜：同为玻璃材质、但比容器亮一档——层级来自材质厚度（Apple §12），
+                        // 不是白色实心块；配合受光边与投影，读作「浮在玻璃里的一枚镜片」。
+                        .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
                         .drawBehind {
-                            // 边线用深/浅发丝线把小胶囊从玻璃容器里「分」出来（顶栏同款层次手法）。
                             val w = 1.dp.toPx()
                             drawRoundRect(
-                                color = if (dark) Color.White.copy(alpha = 0.3f)
-                                else Color.Black.copy(alpha = 0.16f),
-                                cornerRadius = CornerRadius(19.dp.toPx() - w / 2f),
+                                color = if (dark) Color.White.copy(alpha = 0.32f)
+                                else Color.White.copy(alpha = 0.9f),
+                                cornerRadius = CornerRadius(23.dp.toPx() - w / 2f),
                                 style = Stroke(w),
                                 topLeft = Offset(w / 2f, w / 2f),
                                 size = Size(size.width - w, size.height - w),
                             )
-                            // 顶部受光的高光带（光效）。
+                            // 顶部受光高光带（光效）。
                             drawRect(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = if (dark) 0.22f else 0.5f),
+                                        Color.White.copy(alpha = if (dark) 0.24f else 0.55f),
                                         Color.White.copy(alpha = 0f),
                                     ),
                                     startY = 0f,
-                                    endY = size.height * 0.55f,
+                                    endY = size.height * 0.5f,
                                 ),
+                            )
+                            // 底缘一圈极浅的暗折边，让透镜有厚度。
+                            drawRoundRect(
+                                color = Color.Black.copy(alpha = if (dark) 0.18f else 0.07f),
+                                cornerRadius = CornerRadius(23.dp.toPx() - w / 2f),
+                                style = Stroke(w),
+                                topLeft = Offset(w / 2f, w / 2f),
+                                size = Size(size.width - w, size.height - w),
                             )
                         }
                         .shadow(
-                            elevation = 2.dp,
-                            shape = RoundedCornerShape(19.dp),
-                            ambientColor = Color.Black.copy(alpha = 0.12f),
-                            spotColor = Color.Black.copy(alpha = 0.16f),
+                            elevation = 3.dp,
+                            shape = RoundedCornerShape(23.dp),
+                            ambientColor = Color.Black.copy(alpha = 0.14f),
+                            spotColor = Color.Black.copy(alpha = 0.18f),
                         ),
                 )
                 Row(
@@ -1108,7 +1117,7 @@ private fun GlassBarItem(
                 role = Role.Tab,
                 onClick = onClick,
             )
-            .padding(vertical = 6.dp),
+            .padding(vertical = 3.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
