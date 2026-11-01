@@ -1,6 +1,12 @@
 package com.cobo.app.ui
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.Crossfade
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -45,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.CornerRadius
@@ -286,11 +293,23 @@ fun MainShell(nav: NavState) {
                     .layerBackdrop(backdrop)
                     .background(pageContainerColor())
             ) {
-                // The bottom bar only switches on tap, so the page carries the transition itself:
-                // both tabs stay composed through the same state holder and cross-fade.
-                Crossfade(
+                // 页签切换伴随页面左右滑动（不是闪现）：与底栏指示胶囊同一族弹簧，
+                // 视觉顺序 消息(0) · 微博(1) · 我(2)，切到更右的页新页从右侧滑入。
+                val visualOrder = { t: Int -> when (t) { 1 -> 0; 2 -> 2; else -> 1 } }
+                // 与 HigTransition 同参数的位移弹簧（slide 的量纲是像素偏移）。
+                val slideSpring = spring<androidx.compose.ui.unit.IntOffset>(
+                    dampingRatio = 1f,
+                    stiffness = 380f,
+                )
+                AnimatedContent(
                     targetState = tab,
-                    animationSpec = tween(MainTabFadeMillis),
+                    transitionSpec = {
+                        val dir = if (visualOrder(targetState) > visualOrder(initialState)) 1 else -1
+                        (slideInHorizontally(animationSpec = slideSpring) { w -> dir * w } +
+                            fadeIn(tween(MainTabFadeMillis))) togetherWith
+                            (slideOutHorizontally(animationSpec = slideSpring) { w -> -dir * w } +
+                                fadeOut(tween(MainTabFadeMillis)))
+                    },
                     modifier = Modifier.fillMaxSize(),
                     label = "mainTabPage",
                 ) { page ->
@@ -936,10 +955,11 @@ private fun FloatingBottomBar(
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             // 选中指示块：玻璃胶囊随切换滑动（CouiSegmentIndicatorMotion 弹簧 + 光效描边）。
             val density = LocalDensity.current
-            val barH = constraints.maxHeight
+            // 父级是 wrap-content，constraints.maxHeight 无界——用栏高常量换算才准。
+            val barH = with(density) { GlassBarHeight.toPx() }
             val itemW = constraints.maxWidth / 3f
-            val indicatorW = itemW - with(density) { 12.dp.toPx() }
-            val indicatorH = with(density) { 40.dp.toPx() }
+            val indicatorW = itemW - with(density) { 20.dp.toPx() }
+            val indicatorH = with(density) { 38.dp.toPx() }
             val centerForIndex = { i: Int -> itemW / 2f + i * itemW }
             val motion = remember {
                 CouiSegmentIndicatorMotion(
@@ -984,13 +1004,16 @@ private fun FloatingBottomBar(
                             width = with(density) { motion.width.toDp() },
                             height = with(density) { motion.height.toDp() },
                         )
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (dark) Color(0x33FFFFFF) else Color(0xB2FFFFFF))
+                        .clip(RoundedCornerShape(19.dp))
+                        // 小胶囊比容器实一档，读作「浮在大胶囊里的选中块」（顶栏同款层次）。
+                        .background(if (dark) Color(0x66FFFFFF) else Color(0xF0FAFAFD))
                         .drawBehind {
+                            // 边线用深/浅发丝线把小胶囊从玻璃容器里「分」出来（顶栏同款层次手法）。
                             val w = 1.dp.toPx()
                             drawRoundRect(
-                                color = Color.White.copy(alpha = if (dark) 0.22f else 0.65f),
-                                cornerRadius = CornerRadius(20.dp.toPx() - w / 2f),
+                                color = if (dark) Color.White.copy(alpha = 0.3f)
+                                else Color.Black.copy(alpha = 0.16f),
+                                cornerRadius = CornerRadius(19.dp.toPx() - w / 2f),
                                 style = Stroke(w),
                                 topLeft = Offset(w / 2f, w / 2f),
                                 size = Size(size.width - w, size.height - w),
@@ -999,14 +1022,20 @@ private fun FloatingBottomBar(
                             drawRect(
                                 brush = Brush.verticalGradient(
                                     colors = listOf(
-                                        Color.White.copy(alpha = if (dark) 0.16f else 0.38f),
+                                        Color.White.copy(alpha = if (dark) 0.22f else 0.5f),
                                         Color.White.copy(alpha = 0f),
                                     ),
                                     startY = 0f,
                                     endY = size.height * 0.55f,
                                 ),
                             )
-                        },
+                        }
+                        .shadow(
+                            elevation = 2.dp,
+                            shape = RoundedCornerShape(19.dp),
+                            ambientColor = Color.Black.copy(alpha = 0.12f),
+                            spotColor = Color.Black.copy(alpha = 0.16f),
+                        ),
                 )
                 Row(
                     Modifier.fillMaxWidth().height(GlassBarHeight),
