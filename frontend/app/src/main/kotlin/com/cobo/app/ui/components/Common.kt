@@ -29,12 +29,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.luminance
@@ -42,6 +44,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
@@ -228,6 +231,153 @@ fun ActionIcon(
         Icon(icon, text.ifBlank { null }, Modifier.size(17.dp), tint = color)
         if (text.isNotBlank()) {
             Text(text, fontSize = 12.sp, color = color)
+        }
+    }
+}
+
+/**
+ * 玻璃透镜：亮一档的半透玻璃 + 受光发丝边 + 顶部高光 + 底缘暗折边（可选投影）。
+ * 底栏 / 顶栏选中块 / 玻璃圆钮共用这一套绘制——层级来自材质厚度，不是颜色。
+ */
+fun Modifier.glassLens(
+    shape: Shape,
+    dark: Boolean,
+    shadowElevation: Dp = 3.dp,
+): Modifier = this
+    .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
+    .drawBehind {
+        val w = 1.dp.toPx()
+        val r = size.minDimension / 2f
+        // 亮发丝边（顶部受光）。
+        drawRoundRect(
+            color = if (dark) Color.White.copy(alpha = 0.32f)
+            else Color.White.copy(alpha = 0.9f),
+            cornerRadius = CornerRadius(r - w / 2f),
+            style = Stroke(w),
+            topLeft = Offset(w / 2f, w / 2f),
+            size = Size(size.width - w, size.height - w),
+        )
+        // 顶部高光带（光效）。
+        drawRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = if (dark) 0.24f else 0.55f),
+                    Color.White.copy(alpha = 0f),
+                ),
+                startY = 0f,
+                endY = size.height * 0.5f,
+            ),
+        )
+        // 底缘暗折边：向下渐显，只咬住下缘，不盖顶部亮边。
+        drawRoundRect(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    Color.Black.copy(alpha = if (dark) 0.18f else 0.07f),
+                ),
+                startY = 0f,
+                endY = size.height,
+            ),
+            cornerRadius = CornerRadius(r - w / 2f),
+            style = Stroke(w),
+            topLeft = Offset(w / 2f, w / 2f),
+            size = Size(size.width - w, size.height - w),
+        )
+    }
+    .shadow(
+        elevation = shadowElevation,
+        shape = shape,
+        ambientColor = Color.Black.copy(alpha = 0.14f),
+        spotColor = Color.Black.copy(alpha = 0.18f),
+    )
+
+/**
+ * 玻璃圆形图标钮：与导航栏同一套玻璃透镜材质（40dp 圆、按下回弹），
+ * 顶栏搜索 / 发布用它，替换 COUI 的径向渐变圆钮。
+ */
+@Composable
+fun GlassIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val press by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = HighlightedIconButtonDefaults.PressSpring,
+        label = "glassIconPress",
+    )
+    Box(
+        modifier
+            .size(40.dp)
+            .graphicsLayer {
+                val scale = 1f - (1f - HighlightedIconButtonDefaults.PressedScale) * press
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(CircleShape)
+            .glassLens(CircleShape, isDark)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        content()
+    }
+}
+
+/**
+ * 玻璃胶囊文字钮：与玻璃透镜同款材质的 40dp 胶囊（消息页「通知」等顶栏动作用）。
+ */
+@Composable
+fun GlassPillButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) {
+    val isDark = COUITheme.colorScheme.background.luminance() < 0.5f
+    val interactionSource = remember { MutableInteractionSource() }
+    val pressed by interactionSource.collectIsPressedAsState()
+    val press by animateFloatAsState(
+        targetValue = if (pressed) 1f else 0f,
+        animationSpec = HighlightedIconButtonDefaults.PressSpring,
+        label = "glassPillPress",
+    )
+    val shape = RoundedCornerShape(20.dp)
+    Box(
+        modifier
+            .graphicsLayer {
+                val scale = 1f - (1f - HighlightedIconButtonDefaults.PressedScale) * press
+                scaleX = scale
+                scaleY = scale
+            }
+            .clip(shape)
+            .glassLens(shape, isDark)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                enabled = enabled,
+                role = Role.Button,
+                onClick = onClick,
+            )
+            .padding(horizontal = 16.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.height(40.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                color = COUITheme.colorScheme.onSurface,
+            )
         }
     }
 }

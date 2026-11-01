@@ -82,6 +82,8 @@ import com.cobo.app.screen.LocalMessagesPlaceholder
 import com.cobo.app.screen.MessagesScreen
 import com.cobo.app.screen.ProfileContent
 import com.cobo.app.screen.TimelineScreen
+import com.cobo.app.ui.components.GlassIconButton
+import com.cobo.app.ui.components.GlassPillButton
 import com.cobo.app.ui.components.glassPlate
 import com.cobo.app.ui.components.glassPlateAlpha
 import com.cobo.app.ui.components.liquidGlass
@@ -510,7 +512,7 @@ private fun BarContent(
             title = "消息",
             actions = {
                 if (!guest) {
-                    SearchBarActionButton(
+                    GlassPillButton(
                         text = "通知",
                         onClick = { nav.push(Route.Web("https://m.weibo.cn/message/", "通知")) },
                         modifier = Modifier.testTag("top_notice"),
@@ -523,7 +525,7 @@ private fun BarContent(
             title = "我",
             collapsed = titleCollapse,
             actions = {
-                HighlightedIconButton(
+                GlassIconButton(
                     onClick = { nav.push(Route.Settings) },
                     modifier = Modifier.couiTopAppBarActionItem().testTag("top_settings"),
                 ) {
@@ -613,7 +615,7 @@ private fun FeedHeader(
         // 分段胶囊的宽度上限 = 行宽 - 两侧圆钮各自的一段边距；超宽时胶囊收缩而不是把圆钮挤走。
         val sideZone = TopBarButtonZone
         val pillMaxWidth = maxWidth - sideZone * 2
-        HighlightedIconButton(
+        GlassIconButton(
             onClick = onSearch,
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -640,7 +642,7 @@ private fun FeedHeader(
                 modifier = Modifier.align(Alignment.Center),
             )
         }
-        HighlightedIconButton(
+        GlassIconButton(
             onClick = onPublish,
             modifier = Modifier
                 .align(Alignment.CenterEnd)
