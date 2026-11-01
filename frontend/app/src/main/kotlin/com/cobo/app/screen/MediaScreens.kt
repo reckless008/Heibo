@@ -346,7 +346,10 @@ fun ImageViewerScreen(nav: NavState, urls: List<String>, index: Int) {
     val density = LocalDensity.current.density
     val frame = remember { ViewerFrame() }
     // 这条曲线只在宿主自己驱动进场时才有；没有它（比如直接渲染）就当作已经落定。
-    val progress: () -> Float = remember(transition) { transition?.progress ?: { 1f } }
+    // 弹簧带初速时可能过冲，画面缩到缩略图之后必须停住，不能继续缩过缩略图再弹回来。
+    val progress: () -> Float = remember(transition) {
+        { (transition?.progress?.invoke() ?: 1f).coerceIn(0f, 1f) }
+    }
 
     var chrome by remember { mutableStateOf(true) }
     // 下滑退出的跟手距离（px）；progress() 权重把它平滑交接给回缩略图的退场动画。

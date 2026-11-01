@@ -36,14 +36,13 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 对齐苹果 HIG 的转场节奏：打开 / 返回 / 图片缩放共用同一族弹簧，
+ * 对齐苹果 HIG 的转场节奏：打开 / 返回 / 图片缩放共用同一条临界阻尼弹簧，
  * 行程长短只影响路径、不影响节奏（不因「离屏幕中心近」而显得快慢不一）。
  *
- * 两档按「有无动量」区分（Apple Design §4）：普通转场临界阻尼不回弹；
- * 手势甩动释放的接力才配轻微回弹，并且必须把手指速度交给弹簧（§5 速度交接）。
+ * 动量不靠「换一条低阻尼弹簧」表达：手势松手只把手指速度交给进度动画的初速度（§5 速度交接），
+ * 弹簧本身始终 damping 1.0。这样按钮返回和侧滑松手是同一个收尾，不会出现手势回弹、按钮不回弹的分叉。
  */
 val HigTransition = spring<Float>(dampingRatio = 1.0f, stiffness = 380f)
-val HigTransitionFling = spring<Float>(dampingRatio = 0.8f, stiffness = 380f)
 const val RouteParallaxDivisor = 4f
 
 /**
@@ -233,8 +232,9 @@ class NavState {
     }
 
     /**
-     * [velocity] 是手势松手瞬间的进度速度（单位/秒，负值 = 正在向 0 走），
-     * 带动量的返回把它交给弹簧初速度，拖动与动画之间不留「断开感」。
+     * [velocity] 是手势松手瞬间的进度速度（单位/秒，负值 = 正在向 0 走）。
+     * 它只作为弹簧初速度交给动画（速度交接），弹簧始终是 [HigTransition] 的临界阻尼：
+     * 手势和按钮的收尾同一条曲线，动量只体现在「松手后走得多快」，不体现为回弹。
      */
     fun pop(velocity: Float = 0f) {
         if (stack.size <= 1) return
@@ -252,7 +252,8 @@ class NavState {
             // before the frame starts shrinking, or the card would come back drawn over the bar.
             alignCardBelowBar(entry.origin)
             val expand = entry.expand
-            val spec = if (velocity != 0f) HigTransitionFling else HigTransition
+            // 不按有无动量换弹簧：同一条临界阻尼，velocity 只做初速，避免手势/按钮收尾分叉。
+            val spec = HigTransition
             coroutineScope {
                 launch {
                     if (App.reducedMotion) {

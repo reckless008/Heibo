@@ -100,6 +100,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.exp
 
 /**
  * How far a back gesture must pull before the page sits back on its card. A release from there
@@ -335,6 +336,8 @@ fun CoboPredictiveBackHandler(nav: NavState) {
         // 是否出现过中间态：真手势会连续上报进度，按钮 / 键盘返回只有一发终点事件。
         var sawGesture = false
         // 手指速度（进度单位/秒）：松手交给弹簧做速度交接（Apple Design §5）。
+        // 用 80ms 时间常数低通：真机上 BackEvent 的 progress 是分段量化的，
+        // 60Hz 和 120Hz 相邻两个事件的步长不同，直接取瞬时速度会在高刷屏上翻倍甚至反号。
         var lastAt = 0L
         var velocity = 0f
         entry.previewing = true
@@ -346,8 +349,12 @@ fun CoboPredictiveBackHandler(nav: NavState) {
                 val value = (1f - event.progress).coerceIn(0f, 1f)
                 val now = android.os.SystemClock.uptimeMillis()
                 if (sawGesture && lastAt != 0L && now > lastAt) {
-                    // 平滑的速度估计：相邻事件的瞬时速度。
-                    velocity = (value - lastProgress) / ((now - lastAt) / 1000f)
+                    val dt = ((now - lastAt) / 1000f).coerceAtLeast(1f / 240f)
+                    val instant = (value - lastProgress) / dt
+                    val alpha = (1f - exp(-dt / 0.08f)).coerceIn(0f, 1f)
+                    velocity += (instant - velocity) * alpha
+                    // 返回手势只会把页面「关掉」：松手前最后一下轻微回摆不该让页面先弹开再关。
+                    velocity = velocity.coerceIn(-6f, 0f)
                 }
                 lastAt = now
                 if (value in 0.02f..0.98f) sawGesture = true
@@ -440,9 +447,11 @@ private fun RouteLayer(
         )
         .graphicsLayer {
             if (slide) {
+                val p = progress().coerceIn(0f, 1f)
+                val below = topProgress().coerceIn(0f, 1f)
                 translationX = when {
-                    isTop -> (1f - progress()) * widthPx
-                    belowTop -> -topProgress() * widthPx / RouteParallaxDivisor
+                    isTop -> (1f - p) * widthPx
+                    belowTop -> -below * widthPx / RouteParallaxDivisor
                     else -> 0f
                 }
                 shape = cornerShape
@@ -490,8 +499,9 @@ private fun ExpandLayer(
     // under the finger instead of waiting for the pop.
     val exiting = entry.exiting || entry.previewing
     // 帧完整映射行程：跟手时 1:1 跟随手指到落点，不设提前落定的死区；
-    // 按钮 / 普通返回同样走完整行程。
-    fun frameProgress(p: Float): Float = p
+    // 按钮 / 普通返回同样走完整行程。弹簧带初速时可能过冲，视觉上钳在 [0,1]，
+    // 否则帧会缩得比卡片还小再弹回来。
+    fun frameProgress(p: Float): Float = p.coerceIn(0f, 1f)
 
     Box(
         Modifier
@@ -501,7 +511,7 @@ private fun ExpandLayer(
                 // page underneath is exactly what the user is returning to, and dimming it
                 // made the reveal land on a brighter screen than the one the gesture showed.
                 if (!exiting) {
-                    drawRect(Color.Black, alpha = 0.3f * progress())
+                    drawRect(Color.Black, alpha = 0.3f * frameProgress(progress()))
                 }
             }
             .graphicsLayer {
