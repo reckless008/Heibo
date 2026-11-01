@@ -33,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +49,10 @@ import com.cobo.app.ui.CoboIcons
 import com.cobo.app.ui.components.ActionIcon
 import com.cobo.app.ui.components.BackIconButton
 import com.cobo.app.ui.components.LoadingState
+import com.cobo.app.ui.components.glassEdgeLight
+import com.cobo.app.ui.components.glassPlate
+import com.cobo.app.ui.components.glassPlateAlpha
+import com.cobo.app.ui.components.liquidGlass
 import io.github.suqi8.coui.kmp.basic.Card
 import io.github.suqi8.coui.kmp.basic.Icon
 import io.github.suqi8.coui.kmp.basic.Scaffold
@@ -144,77 +149,109 @@ fun PublishScreen(nav: NavState, draft: String) {
             }
         },
     ) { padding ->
-        Column(
+        val dark = COUITheme.colorScheme.background.luminance() < 0.5f
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .imePadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .imePadding(),
         ) {
-            TextField(
-                value = text,
-                onValueChange = { text = it },
-                modifier = Modifier.fillMaxWidth().testTag("publish_input"),
-                label = "分享新鲜事…",
-                backgroundMode = TextFieldMode.Line,
-                minLines = 7,
-                maxLines = 14,
-            )
-            Spacer(Modifier.height(10.dp))
-            if (images.isNotEmpty()) {
-                ImagePickerGrid(images, onRemove = { uri -> images = images - uri }) {
-                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                }
-            } else {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(88.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(COUITheme.colorScheme.surfaceContainerHigh)
-                            .clickable {
-                                picker.launch(
-                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                )
-                            },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(COUIIcons.Image, "添加图片", Modifier.size(28.dp))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp, vertical = 10.dp)
+                    // 底部工具条悬浮在内容之上，留出它的高度，滚到底时最后一行才不被压住。
+                    .padding(bottom = 76.dp),
+            ) {
+                TextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    modifier = Modifier.fillMaxWidth().testTag("publish_input"),
+                    label = "分享新鲜事…",
+                    backgroundMode = TextFieldMode.Line,
+                    minLines = 7,
+                    maxLines = 14,
+                )
+                Spacer(Modifier.height(10.dp))
+                if (images.isNotEmpty()) {
+                    ImagePickerGrid(images, onRemove = { uri -> images = images - uri }) {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                     }
-                    Spacer(Modifier.width(10.dp))
+                } else {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(88.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(COUITheme.colorScheme.surfaceContainerHigh)
+                                .clickable {
+                                    picker.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
+                                },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(COUIIcons.Image, "添加图片", Modifier.size(28.dp))
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        Text(
+                            "最多 9 张图片",
+                            fontSize = 12.sp,
+                            color = COUITheme.colorScheme.onSurfaceSecondary,
+                        )
+                    }
+                }
+                if (progress.isNotBlank()) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(progress, fontSize = 13.sp, color = COUITheme.colorScheme.primary)
+                }
+                if (publishing) {
+                    LoadingState()
+                }
+                if (error != null) {
+                    Spacer(Modifier.height(10.dp))
+                    Text(error!!, fontSize = 13.sp, color = COUITheme.colorScheme.error)
+                }
+            }
+
+            // 图片 / 表情 / @ / # 和字数贴底，键盘弹起时随 imePadding 一起上移。
+            // 外层 Box 只负责定位与外边距：liquidGlass 会丢弃排在它前面的 modifier，
+            // 尺寸和位置必须接在它后面，否则整条会退回 Box 左上角。
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .liquidGlass(
+                            shape = RoundedCornerShape(26.dp),
+                            tint = glassPlate(dark),
+                            alpha = glassPlateAlpha(dark),
+                        )
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .clip(RoundedCornerShape(26.dp))
+                        .glassEdgeLight(dark)
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    ActionIcon(COUIIcons.Image, "", onClick = {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    })
+                    ActionIcon(CoboIcons.Emoji, "", onClick = { emojiOpen = true })
+                    ActionIcon(CoboIcons.At, "", onClick = { text += "@" })
+                    ActionIcon(CoboIcons.Topic, "", onClick = { text += "##" })
+                    Spacer(Modifier.weight(1f))
                     Text(
-                        "最多 9 张图片",
+                        "${text.length}",
                         fontSize = 12.sp,
                         color = COUITheme.colorScheme.onSurfaceSecondary,
                     )
+                    Spacer(Modifier.width(10.dp))
                 }
-            }
-            Spacer(Modifier.height(14.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                ActionIcon(COUIIcons.Image, "", onClick = {
-                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                })
-                ActionIcon(CoboIcons.Emoji, "", onClick = { emojiOpen = true })
-                ActionIcon(CoboIcons.At, "", onClick = { text += "@" })
-                ActionIcon(CoboIcons.Topic, "", onClick = { text += "##" })
-                Spacer(Modifier.weight(1f))
-                Text(
-                    "${text.length}",
-                    fontSize = 12.sp,
-                    color = COUITheme.colorScheme.onSurfaceSecondary,
-                )
-            }
-            if (progress.isNotBlank()) {
-                Spacer(Modifier.height(10.dp))
-                Text(progress, fontSize = 13.sp, color = COUITheme.colorScheme.primary)
-            }
-            if (publishing) {
-                LoadingState()
-            }
-            if (error != null) {
-                Spacer(Modifier.height(10.dp))
-                Text(error!!, fontSize = 13.sp, color = COUITheme.colorScheme.error)
             }
         }
     }

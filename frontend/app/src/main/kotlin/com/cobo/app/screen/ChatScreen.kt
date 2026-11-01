@@ -498,7 +498,9 @@ private fun ChatBubble(
                 modifier = Modifier
                     .widthIn(max = 262.dp)
                     .clip(shape)
-                    .background(if (mine) scheme.primary else scheme.surfaceContainerHigh)
+                    // 对方的泡泡用卡片白（surfaceContainer）；surfaceContainerHigh 在浅色页面
+                    // 上只比背景深一点，泡泡形状几乎看不出来。
+                    .background(if (mine) scheme.primary else scheme.surfaceContainer)
                     .then(
                         if (message.failed) Modifier.clickable(onClick = onRetry) else Modifier,
                     )

@@ -84,6 +84,7 @@ import com.cobo.app.screen.ProfileContent
 import com.cobo.app.screen.TimelineScreen
 import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.GlassPillButton
+import com.cobo.app.ui.components.ScrollEdgeFade
 import com.cobo.app.ui.components.glassEdgeLight
 import com.cobo.app.ui.components.glassPlate
 import com.cobo.app.ui.components.glassPlateAlpha
@@ -347,6 +348,29 @@ fun MainShell(nav: NavState) {
                         }
                     }
                 }
+
+                // iOS 26 的 scroll edge effect：内容滚到悬浮栏边缘时先淡出，
+                // 而不是硬生生从玻璃件下面穿过去。画在页面层里，顶/底栏的玻璃
+                // 取样到的也是渐隐后的画面，文字不会再从胶囊里透出来。
+                val topFade by animateFloatAsState(
+                    targetValue = if (tab == 1) 0f else 1f,
+                    animationSpec = tween(MainTabFadeMillis),
+                    label = "topScrollEdgeFade",
+                )
+                if (topFade > 0.01f) {
+                    ScrollEdgeFade(
+                        modifier = Modifier
+                            .align(Alignment.TopCenter)
+                            .graphicsLayer { alpha = topFade },
+                        height = topBarHeight + 4.dp,
+                        fromBottom = false,
+                    )
+                }
+                ScrollEdgeFade(
+                    modifier = Modifier.align(Alignment.BottomCenter),
+                    height = GlassBarHeight + GlassBarBottomGap + 64.dp,
+                    fromBottom = true,
+                )
             }
         }
 
@@ -693,12 +717,15 @@ private fun FeedTabs(
     // 三格同宽，按「4 个字 + 箭头」预留，字数是 2/3/4 时胶囊和位置都不动。
     // 用 sp 折算，系统字体放大时格子跟着变宽，不会被截断；两侧圆钮占位不够时格子才收窄。
     val density = LocalDensity.current
-    val preferredSegment = with(density) { (4 * 13).sp.toDp() } + 2.dp + 10.dp + 18.dp
-    val segmentWidth = preferredSegment.coerceAtMost((maxWidth - 8.dp) / feedTabs.size)
-    val containerWidth = segmentWidth * feedTabs.size + 8.dp
+    val preferredSegment = with(density) { (4 * 13).sp.toDp() } + 2.dp + 12.dp + 18.dp
+    // 选中透镜与容器端头同心：容器 40dp、透镜 36dp，上下各内缩 2dp，左右也必须 2dp。
+    // 之前左右内缩 4dp，端头缝隙比上下宽一倍，连续曲率就对不上了。
+    val segmentInset = 2.dp
+    val segmentWidth = preferredSegment.coerceAtMost((maxWidth - segmentInset * 2) / feedTabs.size)
+    val containerWidth = segmentWidth * feedTabs.size + segmentInset * 2
     val segmentWidthPx = with(density) { segmentWidth.toPx() }
     val restHeightPx = with(density) { 36.dp.toPx() }
-    val padPx = with(density) { 4.dp.toPx() }
+    val padPx = with(density) { segmentInset.toPx() }
 
     fun centerFor(index: Int): Float = padPx + index * segmentWidthPx + segmentWidthPx / 2f
     val firstCenter = centerFor(0)
@@ -797,13 +824,14 @@ private fun FeedTabs(
                 .glassEdgeLight(dark)
                 .shadow(
                     elevation = 3.dp,
-                    shape = RoundedCornerShape(18.dp),
+                    // 阴影也跟着用连续曲率胶囊，否则圆形胶囊的影子会在端头探出来。
+                    shape = CouiSegmentCapsuleShape,
                     ambientColor = Color.Black.copy(alpha = 0.14f),
                     spotColor = Color.Black.copy(alpha = 0.18f),
                 ),
         )
         Row(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 4.dp),
+            modifier = Modifier.fillMaxSize().padding(horizontal = segmentInset),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             feedTabs.forEachIndexed { index, spec ->
@@ -911,7 +939,7 @@ private fun FeedTabSegment(
                     COUIIcons.Basic.ExpandableIndicator,
                     contentDescription = null,
                     tint = lerp(scheme.onSurfaceSecondary, scheme.onSurface, amount),
-                    modifier = Modifier.size(10.dp),
+                    modifier = Modifier.size(12.dp),
                 )
             }
         }
@@ -968,7 +996,9 @@ private fun FloatingBottomBar(
             // 父级是 wrap-content，constraints.maxHeight 无界——用栏高常量换算才准。
             val barH = with(density) { GlassBarHeight.toPx() }
             val itemW = constraints.maxWidth / 3f
-            val indicatorW = itemW - with(density) { 20.dp.toPx() }
+            // 与容器端头同心：容器 52dp、透镜 46dp，上下内缩 3dp，左右也必须 3dp
+            // （之前左右 10dp，端头缝隙忽宽忽窄，曲率差一眼能看出来）。
+            val indicatorW = itemW - with(density) { 6.dp.toPx() }
             // 透镜高度包住「图标 + 标签」整组（44dp 内容 + 余量）。
             val indicatorH = with(density) { 46.dp.toPx() }
             val centerForIndex = { i: Int -> itemW / 2f + i * itemW }
@@ -1000,7 +1030,9 @@ private fun FloatingBottomBar(
                         blurRadius = 52f,
                     )
                     .fillMaxWidth()
-                    .height(GlassBarHeight),
+                    .height(GlassBarHeight)
+                    // 透镜滑到两端时可能顶到容器圆角，裁掉才不会把玻璃画到外面。
+                    .clip(RoundedCornerShape(GlassBarRadius)),
             ) {
                 // 指示块：半透明胶囊 + 受光描边（光效），随弹簧滑动。
                 Box(

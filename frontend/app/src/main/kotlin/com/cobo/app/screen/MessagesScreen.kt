@@ -2,7 +2,6 @@ package com.cobo.app.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -18,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -125,9 +126,9 @@ fun MessagesScreen(nav: NavState, topInset: Dp) {
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 top = topInset + 14.dp,
-                bottom = 66.dp + navBottomPadding(),
+                // 浮栏高 52 + 下缘留白 18 = 70dp，留 8dp 呼吸，最后一条才不会被压住。
+                bottom = 78.dp + navBottomPadding(),
             ),
-            verticalArrangement = Arrangement.spacedBy(1.dp),
         ) {
             if (items.isEmpty()) {
                 item {
@@ -146,6 +147,9 @@ fun MessagesScreen(nav: NavState, topInset: Dp) {
                     item = item,
                     // 服务端没有已读接口，只能拿「上次点进去时这条会话的预览文字」比：文字变了就是新消息。
                     seen = App.store.chatSeen(uid) == item.text,
+                    roundTop = index == 0,
+                    roundBottom = index == items.lastIndex,
+                    showDivider = index != items.lastIndex,
                     modifier = Modifier.testTag("message_row_$index"),
                 ) {
                     App.store.markChatSeen(uid, item.text)
@@ -171,50 +175,76 @@ fun MessagesScreen(nav: NavState, topInset: Dp) {
 private fun MessageRow(
     item: MessageItem,
     seen: Boolean,
+    roundTop: Boolean,
+    roundBottom: Boolean,
+    showDivider: Boolean,
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
     val scheme = COUITheme.colorScheme
-    Row(
+    // 会话列表收成一张分组卡：首尾行只圆外角，中间行直角，和信息流卡片同一套表面。
+    val shape = RoundedCornerShape(
+        topStart = if (roundTop) 20.dp else 0.dp,
+        topEnd = if (roundTop) 20.dp else 0.dp,
+        bottomEnd = if (roundBottom) 20.dp else 0.dp,
+        bottomStart = if (roundBottom) 20.dp else 0.dp,
+    )
+    Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(pageContainerColor())
-            .clickable(onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .padding(horizontal = 12.dp)
+            .clip(shape)
+            // 和 COUI Card 同一个容器色（surface 是页面底色，暗色下会黑成一块）。
+            .background(scheme.surfaceContainer)
+            .clickable(onClick = onClick),
     ) {
-        Avatar(item.user?.avatar, 46.dp)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Avatar(item.user?.avatar, 46.dp)
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        item.user?.name.orEmpty(),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                    )
+                    Text(
+                        formatWeiboTime(item.createdAt),
+                        fontSize = 11.sp,
+                        color = scheme.onSurfaceSecondary,
+                    )
+                }
+                Spacer(Modifier.height(3.dp))
                 Text(
-                    item.user?.name.orEmpty(),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.weight(1f),
-                    maxLines = 1,
-                )
-                Text(
-                    formatWeiboTime(item.createdAt),
-                    fontSize = 11.sp,
+                    chatPlainText(item.text),
+                    fontSize = 13.sp,
                     color = scheme.onSurfaceSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
-            Spacer(Modifier.height(3.dp))
-            Text(
-                chatPlainText(item.text),
-                fontSize = 13.sp,
-                color = scheme.onSurfaceSecondary,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
+            if (item.unread > 0 && !seen) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(8.dp)
+                        .background(scheme.primary, CircleShape),
+                )
+            }
         }
-        if (item.unread > 0 && !seen) {
-            Spacer(Modifier.width(8.dp))
+        if (showDivider) {
+            // 分隔线从头像右侧起，不切断卡片左缘——iOS 分组列表的常规做法。
             Box(
                 Modifier
-                    .size(8.dp)
-                    .background(scheme.primary, CircleShape),
+                    .fillMaxWidth()
+                    .padding(start = 72.dp)
+                    .height(0.5.dp)
+                    .background(scheme.onSurface.copy(alpha = 0.07f)),
             )
         }
     }

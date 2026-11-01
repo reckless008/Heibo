@@ -95,6 +95,7 @@ import com.cobo.app.ui.components.ErrorState
 import com.cobo.app.ui.components.InputDialog
 import com.cobo.app.ui.components.LoadingState
 import com.cobo.app.ui.components.MemberBadge
+import com.cobo.app.ui.components.ScrollEdgeFade
 import com.cobo.app.ui.components.ShareSheet
 import com.cobo.app.ui.components.StatusCard
 import com.cobo.app.ui.components.WeiboRichText
@@ -455,6 +456,13 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
                     }
                 }
             }
+
+            // 评论滚到动作条底下时先淡出：三枚玻璃胶囊取样到的也是渐隐后的画面。
+            ScrollEdgeFade(
+                modifier = Modifier.align(Alignment.BottomCenter),
+                height = bottomBarHeight + 44.dp,
+                fromBottom = true,
+            )
         }
 
         CompositionLocalProvider(

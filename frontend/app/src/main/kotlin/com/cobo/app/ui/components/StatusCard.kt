@@ -206,20 +206,19 @@ fun StatusHeader(status: Status, onUser: (User) -> Unit, compact: Boolean) {
                 }
             }
             Text(
-                text = buildString {
-                    append(formatWeiboTime(status.createdAt))
-                    if (status.source.isNotBlank()) {
-                        append("  来自 ")
-                        append(status.source)
-                    }
-                    if (status.region.isNotBlank()) {
-                        append("  ")
-                        append(status.region)
-                    }
-                },
-                fontSize = 11.sp,
+                // 时间 / 来源 / IP 用「·」分段，比空格堆叠短一截；窄屏交给省略号，
+                // 不再像以前那样直接裁掉半个「发布于 北…」。
+                text = listOfNotNull(
+                    formatWeiboTime(status.createdAt),
+                    status.source.takeIf { it.isNotBlank() }?.let { "来自 $it" },
+                    // 接口的 region_name 带着「发布于」前缀，和分隔符连用会读成两个动词。
+                    status.region.removePrefix("发布于 ").removePrefix("发布于").trim()
+                        .takeIf { it.isNotBlank() },
+                ).joinToString(" · "),
+                fontSize = 12.sp,
                 color = scheme.onSurfaceSecondary,
                 maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -304,8 +303,8 @@ fun ImageGrid(
                             modifier = Modifier
                                 .weight(1f)
                                 .aspectRatio(1f)
-                                .imageOrigin(urls[index], 8.dp, aspect = aspect, model = shown)
-                                .clip(RoundedCornerShape(8.dp))
+                                .imageOrigin(urls[index], 10.dp, aspect = aspect, model = shown)
+                                .clip(RoundedCornerShape(10.dp))
                                 .background(COUITheme.colorScheme.surfaceContainerHigh)
                                 .preciseClickAnchor(precise)
                                 .combinedClickable(

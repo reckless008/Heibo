@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.cobo.app.App
 import com.cobo.app.data.Membership
+import com.cobo.app.ui.pageContainerColor
 import io.github.suqi8.coui.kmp.basic.BasicComponentDefaults
 import io.github.suqi8.coui.kmp.basic.GlassContainer
 import io.github.suqi8.coui.kmp.basic.HighlightedIconButtonDefaults
@@ -597,6 +598,43 @@ val FullPageRefreshTexts = FullPagePullToRefreshTexts(
 
 /** How long the success hint stays up before the page rebounds; COUI's 800ms default drags. */
 const val FullPageRefreshHoldMillis = 200L
+
+/**
+ * 悬浮栏边缘的渐隐层（iOS 26 scroll edge effect）：内容滚到栏下方时先淡向页面底色。
+ * 必须画在页面的 `layerBackdrop` 容器里，栏的玻璃才会取样到渐隐后的画面；
+ * 静止时它铺在页面底色上，视觉无变化。
+ */
+@Composable
+fun ScrollEdgeFade(
+    height: Dp,
+    fromBottom: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val color = pageContainerColor()
+    Box(
+        modifier
+            .fillMaxWidth()
+            .height(height)
+            .background(
+                if (fromBottom) {
+                    Brush.verticalGradient(
+                        0f to color.copy(alpha = 0f),
+                        0.30f to color.copy(alpha = 0.22f),
+                        0.55f to color.copy(alpha = 0.66f),
+                        0.75f to color.copy(alpha = 0.88f),
+                        1f to color.copy(alpha = 0.96f),
+                    )
+                } else {
+                    Brush.verticalGradient(
+                        0f to color.copy(alpha = 0.94f),
+                        0.40f to color.copy(alpha = 0.72f),
+                        0.75f to color.copy(alpha = 0.24f),
+                        1f to color.copy(alpha = 0f),
+                    )
+                }
+            )
+    )
+}
 
 @Composable
 fun navBottomPadding(): Dp =
