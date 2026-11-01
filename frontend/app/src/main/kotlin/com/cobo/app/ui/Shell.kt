@@ -45,17 +45,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cobo.app.App
@@ -860,10 +867,12 @@ private fun FeedTabSegment(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(2.dp),
         ) {
+            // 排版按 Apple §15：小字用轻微正字距，层级靠字重（选中 Medium / 未选中 Regular）。
             Text(
                 label,
                 fontSize = 13.sp,
                 fontWeight = if (amount >= 0.5f) FontWeight.Medium else FontWeight.Normal,
+                letterSpacing = 0.15.sp,
                 color = lerp(scheme.onSurfaceSecondary, scheme.onSurface, amount),
                 maxLines = 1,
                 softWrap = false,
@@ -916,15 +925,42 @@ private fun FloatingBottomBar(
             .fillMaxWidth()
             .navigationBarsPadding()
     ) {
-        // 宽度对齐顶栏的横向跨度（左右各 12dp），三项均分摊开，不再挤在中间；
+        // 左右边缘对齐三图网格的左右边距（页面 12 + 卡片内衬 14 = 26dp）；
         // 大表面用更强的模糊读作更厚的材质（Apple Design §12）。
         Box(
             Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 12.dp, bottom = GlassBarBottomGap),
+                .padding(start = 26.dp, end = 26.dp, bottom = GlassBarBottomGap),
         ) {
-            Row(
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // 选中指示块：玻璃胶囊随切换滑动（CouiSegmentIndicatorMotion 弹簧 + 光效描边）。
+            val density = LocalDensity.current
+            val barH = constraints.maxHeight
+            val itemW = constraints.maxWidth / 3f
+            val indicatorW = itemW - with(density) { 12.dp.toPx() }
+            val indicatorH = with(density) { 40.dp.toPx() }
+            val centerForIndex = { i: Int -> itemW / 2f + i * itemW }
+            val motion = remember {
+                CouiSegmentIndicatorMotion(
+                    center = centerForIndex(when (tab) { 1 -> 0; 2 -> 2; else -> 1 }),
+                    width = indicatorW,
+                    height = indicatorH,
+                )
+            }
+            LaunchedEffect(motion) { motion.animate() }
+            LaunchedEffect(tab, itemW) {
+                val index = when (tab) { 1 -> 0; 2 -> 2; else -> 1 }
+                motion.select(
+                    targetCenter = centerForIndex(index),
+                    targetWidth = indicatorW,
+                    restHeight = indicatorH,
+                    firstCenter = centerForIndex(0),
+                    lastCenter = centerForIndex(2),
+                    maxExtraWidth = with(density) { 8.dp.toPx() },
+                )
+            }
+            Box(
                 Modifier
                     .liquidGlass(
                         RoundedCornerShape(GlassBarRadius),
@@ -933,10 +969,49 @@ private fun FloatingBottomBar(
                         blurRadius = 52f,
                     )
                     .fillMaxWidth()
-                    .height(GlassBarHeight)
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
+                    .height(GlassBarHeight),
             ) {
+                // 指示块：半透明胶囊 + 受光描边（光效），随弹簧滑动。
+                Box(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                (motion.centerX - motion.width / 2f).roundToInt(),
+                                ((barH - motion.height) / 2f).roundToInt(),
+                            )
+                        }
+                        .size(
+                            width = with(density) { motion.width.toDp() },
+                            height = with(density) { motion.height.toDp() },
+                        )
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(if (dark) Color(0x33FFFFFF) else Color(0xB2FFFFFF))
+                        .drawBehind {
+                            val w = 1.dp.toPx()
+                            drawRoundRect(
+                                color = Color.White.copy(alpha = if (dark) 0.22f else 0.65f),
+                                cornerRadius = CornerRadius(20.dp.toPx() - w / 2f),
+                                style = Stroke(w),
+                                topLeft = Offset(w / 2f, w / 2f),
+                                size = Size(size.width - w, size.height - w),
+                            )
+                            // 顶部受光的高光带（光效）。
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.White.copy(alpha = if (dark) 0.16f else 0.38f),
+                                        Color.White.copy(alpha = 0f),
+                                    ),
+                                    startY = 0f,
+                                    endY = size.height * 0.55f,
+                                ),
+                            )
+                        },
+                )
+                Row(
+                    Modifier.fillMaxWidth().height(GlassBarHeight),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                 // 位置按用户要求交换：左「消息」、中「微博」、右「我」。tab 值仍沿用
                 // 0=微博 / 1=消息 / 2=我，只换视觉顺序，避免影响 nav.mainTab 的持久化语义。
                 GlassBarItem(
@@ -963,7 +1038,9 @@ private fun FloatingBottomBar(
                     label = "我",
                     modifier = Modifier.weight(1f).testTag("bottom_tab_profile"),
                 )
+                }
             }
+        }
         }
     }
 }
@@ -1018,11 +1095,11 @@ private fun GlassBarItem(
                 tint = tint,
             )
         }
-        // 玻璃上的文字按 vibrancy 规则加实：稍重的字重 + 轻微字距，保证可读性。
+        // 排版按 Apple §15：小字正字距、层级靠字重——选中 Medium、未选中 Regular。
         Text(
             label,
             fontSize = 11.sp,
-            fontWeight = FontWeight.Medium,
+            fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
             letterSpacing = 0.2.sp,
             color = tint,
             maxLines = 1,
