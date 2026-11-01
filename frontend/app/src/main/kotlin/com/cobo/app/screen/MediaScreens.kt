@@ -395,42 +395,39 @@ fun ImageViewerScreen(nav: NavState, urls: List<String>, index: Int) {
             beyondViewportPageCount = 1,
             modifier = Modifier
                 .fillMaxSize()
-                // 下滑退出：未放大时图片随手势下沉，松手过阈值直接返回（退场动画接力收尾）。
+                // 下滑退出：未放大时图片随手势下沉，松手按「位移或甩动速度」判定退出（动量投影）。
                 .pointerInput(density) {
+                    val tracker = androidx.compose.ui.input.pointer.util.VelocityTracker()
+                    fun settleBack(vel: Float) {
+                        val from = dragY
+                        scope.launch {
+                            animate(
+                                initialValue = from,
+                                targetValue = 0f,
+                                initialVelocity = vel,
+                                animationSpec = spring(
+                                    dampingRatio = 0.8f,
+                                    stiffness = Spring.StiffnessMediumLow,
+                                ),
+                            ) { value, _ -> dragY = value }
+                        }
+                    }
                     detectVerticalDragGestures(
-                        onVerticalDrag = { _, drag ->
+                        onDragStart = { tracker.resetTracking() },
+                        onVerticalDrag = { change, drag ->
+                            tracker.addPosition(change.uptimeMillis, change.position)
                             if (!frame.zoomed) {
                                 dragY = (dragY + drag).coerceIn(0f, size.height * 0.6f)
                             }
                         },
                         onDragEnd = {
-                            val passed = dragY > 120f * density
+                            val vy = tracker.calculateVelocity().y // px/s，向下为正
+                            // 动量投影（Apple Design §6）：快甩小距离也算退出，慢拖过线才算退出。
+                            val passed = dragY > 120f * density || vy > 800f * density
                             if (passed) nav.pop()
-                            val from = dragY
-                            scope.launch {
-                                animate(
-                                    initialValue = from,
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.9f,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                ) { value, _ -> dragY = value }
-                            }
+                            settleBack(vy)
                         },
-                        onDragCancel = {
-                            val from = dragY
-                            scope.launch {
-                                animate(
-                                    initialValue = from,
-                                    targetValue = 0f,
-                                    animationSpec = spring(
-                                        dampingRatio = 0.9f,
-                                        stiffness = Spring.StiffnessMediumLow,
-                                    ),
-                                ) { value, _ -> dragY = value }
-                            }
-                        },
+                        onDragCancel = { settleBack(0f) },
                     )
                 }
                 .graphicsLayer {

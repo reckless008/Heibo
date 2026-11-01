@@ -19,6 +19,15 @@ class MainActivity : ComponentActivity() {
      * 请求屏幕最高刷新率。部分系统对未声明的应用压到 60Hz，
      * 这里按当前屏幕支持的最高模式显式指定（行程动画的顺滑度直接依赖它）。
      */
+    /** 系统「移除动画」（无障碍）：animator 时长缩放为 0。 */
+    private fun isAnimationDisabled(): Boolean = runCatching {
+        android.provider.Settings.Global.getFloat(
+            contentResolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        ) == 0f
+    }.getOrDefault(false)
+
     private fun requestHighestRefreshRate() {
         @Suppress("DEPRECATION")
         val modes = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
@@ -31,6 +40,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requestHighestRefreshRate()
+        App.reducedMotion = isAnimationDisabled()
 
         setContent {
             CoboTheme {

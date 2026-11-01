@@ -259,6 +259,8 @@ fun Modifier.liquidGlass(
     tint: Color,
     alpha: Float,
     highlightAlpha: Float = 1f,
+    /** 模糊半径（px）：大表面用更强的模糊读作「更厚的材质」（Apple Design §12）。 */
+    blurRadius: Float = 44f,
 ): Modifier {
     val backdrop = LocalBackdrop.current
     if (backdrop == null) return Modifier.background(tint.copy(alpha = alpha), shape)
@@ -268,7 +270,7 @@ fun Modifier.liquidGlass(
             backdrop = backdrop,
             shape = { shape },
             effects = {
-                blur(44f)
+                blur(blurRadius)
                 colorControls(saturation = 1.22f)
             },
             highlight = { highlight },

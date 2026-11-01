@@ -36,10 +36,14 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 /**
- * 对齐苹果 HIG 的转场节奏：打开 / 返回 / 图片缩放共用同一根弹簧，
+ * 对齐苹果 HIG 的转场节奏：打开 / 返回 / 图片缩放共用同一族弹簧，
  * 行程长短只影响路径、不影响节奏（不因「离屏幕中心近」而显得快慢不一）。
+ *
+ * 两档按「有无动量」区分（Apple Design §4）：普通转场临界阻尼不回弹；
+ * 手势甩动释放的接力才配轻微回弹，并且必须把手指速度交给弹簧（§5 速度交接）。
  */
-val HigTransition = spring<Float>(dampingRatio = 0.9f, stiffness = 380f)
+val HigTransition = spring<Float>(dampingRatio = 1.0f, stiffness = 380f)
+val HigTransitionFling = spring<Float>(dampingRatio = 0.8f, stiffness = 380f)
 const val RouteParallaxDivisor = 4f
 
 /**
@@ -206,11 +210,19 @@ class NavState {
             if (!expand) entry.fade.snapTo(1f)
             coroutineScope {
                 launch {
-                    entry.progress.animateTo(targetValue = 1f, animationSpec = HigTransition)
+                    if (App.reducedMotion) {
+                        entry.progress.snapTo(1f)
+                    } else {
+                        entry.progress.animateTo(targetValue = 1f, animationSpec = HigTransition)
+                    }
                 }
                 if (expand) {
                     launch {
-                        entry.fade.animateTo(targetValue = 1f, animationSpec = HigTransition)
+                        if (App.reducedMotion) {
+                            entry.fade.snapTo(1f)
+                        } else {
+                            entry.fade.animateTo(targetValue = 1f, animationSpec = HigTransition)
+                        }
                     }
                 }
             }
@@ -220,7 +232,11 @@ class NavState {
         }
     }
 
-    fun pop() {
+    /**
+     * [velocity] 是手势松手瞬间的进度速度（单位/秒，负值 = 正在向 0 走），
+     * 带动量的返回把它交给弹簧初速度，拖动与动画之间不留「断开感」。
+     */
+    fun pop(velocity: Float = 0f) {
         if (stack.size <= 1) return
         val entry = stack.last()
         if (entry.exiting) return
@@ -236,13 +252,30 @@ class NavState {
             // before the frame starts shrinking, or the card would come back drawn over the bar.
             alignCardBelowBar(entry.origin)
             val expand = entry.expand
+            val spec = if (velocity != 0f) HigTransitionFling else HigTransition
             coroutineScope {
                 launch {
-                    entry.progress.animateTo(targetValue = 0f, animationSpec = HigTransition)
+                    if (App.reducedMotion) {
+                        entry.progress.snapTo(0f)
+                    } else {
+                        entry.progress.animateTo(
+                            targetValue = 0f,
+                            animationSpec = spec,
+                            initialVelocity = velocity,
+                        )
+                    }
                 }
                 if (expand) {
                     launch {
-                        entry.fade.animateTo(targetValue = 0f, animationSpec = HigTransition)
+                        if (App.reducedMotion) {
+                            entry.fade.snapTo(0f)
+                        } else {
+                            entry.fade.animateTo(
+                                targetValue = 0f,
+                                animationSpec = spec,
+                                initialVelocity = velocity,
+                            )
+                        }
                     }
                 }
             }

@@ -334,6 +334,9 @@ fun CoboPredictiveBackHandler(nav: NavState) {
         var moved = false
         // 是否出现过中间态：真手势会连续上报进度，按钮 / 键盘返回只有一发终点事件。
         var sawGesture = false
+        // 手指速度（进度单位/秒）：松手交给弹簧做速度交接（Apple Design §5）。
+        var lastAt = 0L
+        var velocity = 0f
         entry.previewing = true
         // The snapshot was recorded when the card was tapped; re-record it now so the page
         // hands back the card as it looks today, not as it looked under the finger.
@@ -341,6 +344,12 @@ fun CoboPredictiveBackHandler(nav: NavState) {
         try {
             events.collect { event ->
                 val value = (1f - event.progress).coerceIn(0f, 1f)
+                val now = android.os.SystemClock.uptimeMillis()
+                if (sawGesture && lastAt != 0L && now > lastAt) {
+                    // 平滑的速度估计：相邻事件的瞬时速度。
+                    velocity = (value - lastProgress) / ((now - lastAt) / 1000f)
+                }
+                lastAt = now
                 if (value in 0.02f..0.98f) sawGesture = true
                 if (value < 0.98f) moved = true
                 lastProgress = value
@@ -361,9 +370,9 @@ fun CoboPredictiveBackHandler(nav: NavState) {
             if (lastProgress <= 0.02f && moved) {
                 nav.completePredictivePop(entry)
             } else {
-                // 提前松手：关掉预览态再补完整退场，尾段不再被压缩。
+                // 提前松手：关掉预览态再补完整退场，并把手指速度交给弹簧（速度交接）。
                 entry.previewing = false
-                nav.pop()
+                nav.pop(velocity = velocity)
             }
         } catch (cancelled: CancellationException) {
             // The page has already collapsed onto its card: the system calls that a cancelled

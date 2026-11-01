@@ -131,6 +131,9 @@ object App {
     val feedRefreshEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val feedTopEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
     val messagesTopEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+
+    /** 系统「移除动画」开启时为 true：转场降级为直接落位（Apple Design §14）。 */
+    var reducedMotion = false
     val followEvents = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
 
     fun notifyFollowChanged() {

@@ -916,13 +916,25 @@ private fun FloatingBottomBar(
             .fillMaxWidth()
             .navigationBarsPadding()
     ) {
-        // couiGlassSurface 丢弃它前面的 modifier，胶囊的浮空位置放在外层 Box 上。
-        Box(Modifier.align(Alignment.BottomCenter).padding(bottom = GlassBarBottomGap)) {
+        // 宽度对齐顶栏的横向跨度（左右各 12dp），三项均分摊开，不再挤在中间；
+        // 大表面用更强的模糊读作更厚的材质（Apple Design §12）。
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .padding(start = 12.dp, end = 12.dp, bottom = GlassBarBottomGap),
+        ) {
             Row(
                 Modifier
-                    .liquidGlass(RoundedCornerShape(GlassBarRadius), glassPlate(dark), glassPlateAlpha(dark))
+                    .liquidGlass(
+                        RoundedCornerShape(GlassBarRadius),
+                        glassPlate(dark),
+                        glassPlateAlpha(dark),
+                        blurRadius = 52f,
+                    )
+                    .fillMaxWidth()
                     .height(GlassBarHeight)
-                    .padding(horizontal = 6.dp),
+                    .padding(horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 // 位置按用户要求交换：左「消息」、中「微博」、右「我」。tab 值仍沿用
@@ -933,7 +945,7 @@ private fun FloatingBottomBar(
                     icon = CoboIcons.MessagesOutline,
                     selectedIcon = CoboIcons.MessagesFilled,
                     label = "消息",
-                    modifier = Modifier.testTag("bottom_tab_messages"),
+                    modifier = Modifier.weight(1f).testTag("bottom_tab_messages"),
                 )
                 GlassBarItem(
                     selected = tab == 0,
@@ -941,7 +953,7 @@ private fun FloatingBottomBar(
                     icon = CoboIcons.FeedOutline,
                     selectedIcon = CoboIcons.FeedFilled,
                     label = "微博",
-                    modifier = Modifier.testTag("bottom_tab_feed"),
+                    modifier = Modifier.weight(1f).testTag("bottom_tab_feed"),
                 )
                 GlassBarItem(
                     selected = tab == 2,
@@ -949,7 +961,7 @@ private fun FloatingBottomBar(
                     icon = CoboIcons.ProfileOutline,
                     selectedIcon = CoboIcons.ProfileFilled,
                     label = "我",
-                    modifier = Modifier.testTag("bottom_tab_profile"),
+                    modifier = Modifier.weight(1f).testTag("bottom_tab_profile"),
                 )
             }
         }
@@ -980,7 +992,6 @@ private fun GlassBarItem(
     )
     Column(
         modifier
-            .width(52.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -991,7 +1002,7 @@ private fun GlassBarItem(
                 role = Role.Tab,
                 onClick = onClick,
             )
-            .padding(vertical = 7.dp),
+            .padding(vertical = 6.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -1007,6 +1018,14 @@ private fun GlassBarItem(
                 tint = tint,
             )
         }
-        Text(label, fontSize = 10.sp, color = tint, maxLines = 1)
+        // 玻璃上的文字按 vibrancy 规则加实：稍重的字重 + 轻微字距，保证可读性。
+        Text(
+            label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            letterSpacing = 0.2.sp,
+            color = tint,
+            maxLines = 1,
+        )
     }
 }
