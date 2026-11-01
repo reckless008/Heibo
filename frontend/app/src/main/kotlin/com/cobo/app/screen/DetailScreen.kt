@@ -96,7 +96,7 @@ import com.cobo.app.ui.components.LoadingState
 import com.cobo.app.ui.components.MemberBadge
 import com.cobo.app.ui.components.ShareSheet
 import com.cobo.app.ui.components.StatusCard
-import com.cobo.app.ui.components.WeiboText
+import com.cobo.app.ui.components.WeiboRichText
 import com.cobo.app.ui.components.fmtCount
 import com.cobo.app.ui.components.navBottomPadding
 import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlay
@@ -699,11 +699,12 @@ private fun CommentCard(
                     }
                 }
                 Spacer(Modifier.height(3.dp))
-                WeiboText(
+                WeiboRichText(
                     html = comment.textHtml,
                     fontSize = 14.sp,
                     lineHeight = 20.sp,
-                )
+                selectable = false,
+            )
                 comment.reply?.let { reply ->
                     Spacer(Modifier.height(6.dp))
                     // The quoted reply is the page tone inside a card, so the app keeps exactly one
@@ -720,11 +721,12 @@ private fun CommentCard(
                             fontSize = 12.sp,
                             color = scheme.primary,
                         )
-                        WeiboText(
+                        WeiboRichText(
                             html = reply.textHtml,
                             fontSize = 13.sp,
                             lineHeight = 18.sp,
-                        )
+                selectable = false,
+            )
                     }
                 }
                 val total = maxOf(replyTotal, replies.size)
@@ -916,10 +918,11 @@ private fun ReplyRow(
                 }
             }
             Spacer(Modifier.height(2.dp))
-            WeiboText(
+            WeiboRichText(
                 html = reply.textHtml,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
+                selectable = false,
             )
             Spacer(Modifier.height(2.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {

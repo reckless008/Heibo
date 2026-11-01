@@ -377,11 +377,11 @@ fun CoboPredictiveBackHandler(nav: NavState) {
             withContext(NonCancellable) {
                 coroutineScope {
                     launch {
-                        entry.progress.animateTo(1f, tween(180, easing = ExpandEasing))
+                        entry.progress.animateTo(1f, HigTransition)
                     }
                     if (entry.expand) {
                         launch {
-                            entry.fade.animateTo(1f, tween(180, easing = LinearEasing))
+                            entry.fade.animateTo(1f, HigTransition)
                         }
                     }
                 }

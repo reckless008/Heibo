@@ -3,6 +3,7 @@ package com.cobo.app.ui
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
@@ -34,15 +35,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
-val ExpandEasing = CubicBezierEasing(0.3f, 0f, 0.1f, 1f)
-const val ExpandEnterMillis = 420
-
 /**
- * 返回与进场对称（420/400）：普通返回走完整行程，没有手势落点压缩，
- * 时长太短仍会读成「啪一下收掉」。曲线与进场同一条 [ExpandEasing]。
+ * 对齐苹果 HIG 的转场节奏：打开 / 返回 / 图片缩放共用同一根弹簧，
+ * 行程长短只影响路径、不影响节奏（不因「离屏幕中心近」而显得快慢不一）。
  */
-const val ExpandExitMillis = 400
-const val RouteSlideMillis = 320
+val HigTransition = spring<Float>(dampingRatio = 0.9f, stiffness = 380f)
 const val RouteParallaxDivisor = 4f
 
 /**
@@ -207,24 +204,13 @@ class NavState {
             withFrameNanos { }
             val expand = entry.expand
             if (!expand) entry.fade.snapTo(1f)
-            val millis = when {
-                expand -> ExpandEnterMillis
-                entry.growsFromImage -> ImageZoomMillis
-                else -> RouteSlideMillis
-            }
             coroutineScope {
                 launch {
-                    entry.progress.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(millis, easing = ExpandEasing),
-                    )
+                    entry.progress.animateTo(targetValue = 1f, animationSpec = HigTransition)
                 }
                 if (expand) {
                     launch {
-                        entry.fade.animateTo(
-                            targetValue = 1f,
-                            animationSpec = tween(ExpandEnterMillis, easing = LinearEasing),
-                        )
+                        entry.fade.animateTo(targetValue = 1f, animationSpec = HigTransition)
                     }
                 }
             }
@@ -250,26 +236,13 @@ class NavState {
             // before the frame starts shrinking, or the card would come back drawn over the bar.
             alignCardBelowBar(entry.origin)
             val expand = entry.expand
-            val baseMillis = when {
-                expand -> ExpandExitMillis
-                entry.growsFromImage -> ImageZoomMillis
-                else -> RouteSlideMillis
-            }
-            val remaining = entry.progress.value.coerceIn(0f, 1f)
-            val millis = (baseMillis * remaining).toInt().coerceAtLeast(1)
             coroutineScope {
                 launch {
-                    entry.progress.animateTo(
-                        targetValue = 0f,
-                        animationSpec = tween(millis, easing = ExpandEasing),
-                    )
+                    entry.progress.animateTo(targetValue = 0f, animationSpec = HigTransition)
                 }
                 if (expand) {
                     launch {
-                        entry.fade.animateTo(
-                            targetValue = 0f,
-                            animationSpec = tween(millis, easing = ExpandEasing),
-                        )
+                        entry.fade.animateTo(targetValue = 0f, animationSpec = HigTransition)
                     }
                 }
             }

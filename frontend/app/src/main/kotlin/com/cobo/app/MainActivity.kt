@@ -14,10 +14,23 @@ import com.cobo.app.ui.CoboTheme
 import com.cobo.app.ui.isDarkTheme
 
 class MainActivity : ComponentActivity() {
+
+    /**
+     * 请求屏幕最高刷新率。部分系统对未声明的应用压到 60Hz，
+     * 这里按当前屏幕支持的最高模式显式指定（行程动画的顺滑度直接依赖它）。
+     */
+    private fun requestHighestRefreshRate() {
+        @Suppress("DEPRECATION")
+        val modes = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) display
+        else windowManager.defaultDisplay)?.supportedModes ?: return
+        val best = modes.maxByOrNull { it.refreshRate } ?: return
+        window.attributes = window.attributes.apply { preferredDisplayModeId = best.modeId }
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         App.init(this)
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestHighestRefreshRate()
 
         setContent {
             CoboTheme {

@@ -321,6 +321,7 @@ fun ProfileContent(
                     topInset = topInset,
                     pullState = pullState,
                     onCover = { urls, i -> nav.push(Route.Images(urls, i)) },
+                    onAvatar = { url -> nav.push(Route.Images(listOf(url), 0)) },
                     followLabel = when {
                         App.repo.guest -> if (tag == FollowTag.Local) "已本地关注" else "本地关注"
                         user?.following == true -> "已关注"
@@ -494,6 +495,7 @@ private fun ProfileHeader(
     /** 顶栏（含状态栏）的高度：封面顶到屏幕最上沿，多出这一截藏在顶栏玻璃下面。 */
     topInset: Dp = 0.dp,
     onCover: (List<String>, Int) -> Unit = { _, _ -> },
+    onAvatar: (String) -> Unit = {},
 ) {
     val scheme = COUITheme.colorScheme
     val covers = user?.covers.orEmpty()
@@ -618,6 +620,8 @@ private fun ProfileHeader(
                         .size(ProfileAvatarRing)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.9f))
+                        // 点头像看头像大图；不加点击会穿透到下层封面（打开的就成了背景图）。
+                        .clickable { user?.avatar?.let(onAvatar) }
                         .padding(2.dp),
                 ) {
                     Avatar(user?.avatar, 64.dp)

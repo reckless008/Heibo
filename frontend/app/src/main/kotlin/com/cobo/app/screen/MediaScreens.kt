@@ -933,7 +933,8 @@ private fun GraphicsLayerScope.openFrame(progress: Float, thumb: ThumbBounds?, a
     val source = thumb?.rect
     val rest = (aspect ?: source?.let { it.width / it.height })
         ?.let { restSize(size.width, size.height, it) }
-    if (source == null || rest == null || rest.height > size.height + 0.5f) {
+    // 只有完全找不到缩略图位置才降级为普通缩放；竖图/长图同样走「从缩略图长出」的生长。
+    if (source == null || rest == null) {
         settle()
         alpha = progress
         scaleX = lerp(0.92f, 1f, progress)

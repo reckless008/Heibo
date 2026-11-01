@@ -107,10 +107,11 @@ fun StatusCard(
         StatusHeader(status, onUser, compact)
         if (status.textHtml.isNotBlank()) {
             Spacer(Modifier.height(6.dp))
-            WeiboText(
+            WeiboRichText(
                 html = status.textHtml,
                 fontSize = if (compact) 14.sp else 15.sp,
                 lineHeight = if (compact) 20.sp else 22.sp,
+                selectable = false,
             )
         }
         if (status.isVote) {
@@ -414,10 +415,11 @@ fun RetweetBlock(
         )
         if (status.textHtml.isNotBlank()) {
             Spacer(Modifier.height(2.dp))
-            WeiboText(
+            WeiboRichText(
                 html = status.textHtml,
                 fontSize = 13.sp,
                 lineHeight = 18.sp,
+                selectable = false,
             )
         }
         if (status.isVote) {
