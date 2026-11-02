@@ -101,7 +101,7 @@ Heibo 从 COBO + [COUI](https://github.com/suqi8/coui) 起步，但当前版本�
 | :--- | :--- |
 | applicationId | `com.cobo.app` |
 | 应用名 | Heibo |
-| 版本 | 1.2.1（versionCode 10201） |
+| 版本 | 1.2.5（versionCode 10205） |
 | minSdk / targetSdk | 26 / 37 |
 | 工程 | `frontend/`（独立 Gradle 工程） |
 
