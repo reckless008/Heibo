@@ -1285,7 +1285,7 @@ fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = ""
             verticalAlignment = Alignment.CenterVertically,
         ) {
             VideoGlassButton(40.dp, { nav.pop() }) {
-                Icon(COUIIcons.Close, "关闭", Modifier.size(22.dp), tint = Color.White)
+                Icon(COUIIcons.Close, "关闭", Modifier.size(22.dp), tint = scheme.onSurface)
             }
             Text(title, color = Color.White, fontSize = 14.sp, maxLines = 1)
         }
@@ -1479,13 +1479,9 @@ private fun VideoGlassButton(
     onClick: () -> Unit,
     content: @Composable () -> Unit,
 ) {
+    val dark = COUITheme.colorScheme.background.luminance() < 0.5f
     Box(
-        Modifier
-            .size(size)
-            // 亮画面上玻璃会发白，白图标对比不足；先压一层深色底再叠玻璃。
-            .background(Color.Black.copy(alpha = 0.35f), CircleShape)
-            .glassCircle(dark = true)
-            .clickable(onClick = onClick),
+        Modifier.size(size).glassCircle(dark = dark).clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { content() }
 }
@@ -1496,7 +1492,7 @@ private fun VideoIcon(resId: Int, description: String, size: Dp) {
         painter = painterResource(resId),
         contentDescription = description,
         modifier = Modifier.size(size),
-        colorFilter = ColorFilter.tint(Color.White),
+        colorFilter = ColorFilter.tint(COUITheme.colorScheme.onSurface),
     )
 }
 

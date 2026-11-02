@@ -107,6 +107,12 @@ import kotlin.math.exp
  * returns for good: the frame is already home, so springing the page open again reads as a bug.
  */
 private const val LandedProgress = 0.2f
+/** 起步阈值：边缘划动超过屏幕这个比例才进入返回预览，轻触不触发。 */
+private const val PredictiveStartDrag = 0.08f
+/** 提交阈值：划到屏幕这个比例松手才算完成返回。 */
+private const val PredictiveCommitDrag = 0.45f
+/** 关闭方向的甩动速度（进度/秒）：足够快的甩动可以越过距离阈值直接提交。 */
+private const val PredictiveFlingVelocity = -2f
 
 @Composable
 fun CoboRoot() {
@@ -331,78 +337,88 @@ fun CoboPredictiveBackHandler(nav: NavState) {
             return@PredictiveBackHandler
         }
 
-        var lastProgress = 1f
-        var moved = false
-        // 是否出现过中间态：真手势会连续上报进度，按钮 / 键盘返回只有一发终点事件。
+        var previewStarted = false
         var sawGesture = false
-        // 手指速度（进度单位/秒）：松手交给弹簧做速度交接（Apple Design §5）。
-        // 用 80ms 时间常数低通：真机上 BackEvent 的 progress 是分段量化的，
-        // 60Hz 和 120Hz 相邻两个事件的步长不同，直接取瞬时速度会在高刷屏上翻倍甚至反号。
+        var lastRawValue = 1f
+        var lastProgress = 1f
+        var lastDisplay = 1f
         var lastAt = 0L
         var velocity = 0f
-        entry.previewing = true
-        // The snapshot was recorded when the card was tapped; re-record it now so the page
-        // hands back the card as it looks today, not as it looked under the finger.
-        entry.origin?.let { it.refreshKey++ }
+
+        suspend fun cancelPreview() {
+            withContext(NonCancellable) {
+                coroutineScope {
+                    launch { entry.progress.animateTo(1f, HigTransition) }
+                    if (entry.expand) {
+                        launch { entry.fade.animateTo(1f, HigTransition) }
+                    }
+                }
+            }
+            entry.previewing = false
+        }
+
         try {
             events.collect { event ->
                 val value = (1f - event.progress).coerceIn(0f, 1f)
-                val now = android.os.SystemClock.uptimeMillis()
-                if (sawGesture && lastAt != 0L && now > lastAt) {
-                    val dt = ((now - lastAt) / 1000f).coerceAtLeast(1f / 240f)
-                    val instant = (value - lastProgress) / dt
-                    val alpha = (1f - exp(-dt / 0.08f)).coerceIn(0f, 1f)
-                    velocity += (instant - velocity) * alpha
-                    // 返回手势只会把页面「关掉」：松手前最后一下轻微回摆不该让页面先弹开再关。
-                    velocity = velocity.coerceIn(-6f, 0f)
+                val rawDrag = 1f - value
+                // 端点值（按钮/键盘返回的那一发终点事件）不算跟手，避免按钮返回被当成手势。
+                if (value > 0.001f && value < 0.999f) sawGesture = true
+                lastRawValue = value
+
+                // Apple §10：先要一个明确的起步阈值，再开始跟手；不能一碰边缘就退。
+                if (!previewStarted && sawGesture && rawDrag >= PredictiveStartDrag) {
+                    previewStarted = true
+                    entry.previewing = true
+                    entry.origin?.let { it.refreshKey++ }
                 }
-                lastAt = now
-                if (value in 0.02f..0.98f) sawGesture = true
-                if (value < 0.98f) moved = true
-                lastProgress = value
-                // 只跟真手势的进度；按钮返回的瞬时终点不许把页面一帧拽走。
-                // 跟手必须 1:1 即时映射：任何补间都会让帧拖在手指后面，显得拖泥带水。
-                if (sawGesture) {
-                    entry.progress.snapTo(value)
-                    if (entry.expand) entry.fade.snapTo(value)
+                if (previewStarted) {
+                    // 前 8% 只用来确认手势；越过阈值后从 1 开始 1:1 跟手，避免起手跳变。
+                    val display = (value / (1f - PredictiveStartDrag)).coerceIn(0f, 1f)
+                    val now = android.os.SystemClock.uptimeMillis()
+                    if (lastAt != 0L && now > lastAt) {
+                        val dt = ((now - lastAt) / 1000f).coerceAtLeast(1f / 240f)
+                        val instant = (display - lastDisplay) / dt
+                        val alpha = (1f - exp(-dt / 0.08f)).coerceIn(0f, 1f)
+                        velocity += (instant - velocity) * alpha
+                        velocity = velocity.coerceIn(-6f, 0f)
+                    }
+                    lastAt = now
+                    lastDisplay = display
+                    lastProgress = display
+                    entry.progress.snapTo(display)
+                    if (entry.expand) entry.fade.snapTo(display)
                 }
             }
+
             if (!sawGesture) {
-                // 按钮 / 键盘返回：没有跟手过程，退回普通返回的完整动画。
+                // 按钮 / 键盘返回：没有跟手过程，走完整退场。
                 entry.previewing = false
                 nav.pop()
                 return@PredictiveBackHandler
             }
-            // Released past the threshold: finish from wherever the finger left the page.
-            if (lastProgress <= 0.02f && moved) {
-                nav.completePredictivePop(entry)
-            } else {
-                // 提前松手：关掉预览态再补完整退场，并把手指速度交给弹簧（速度交接）。
+            if (!previewStarted) {
+                // 只是边缘轻微划动：不返回，页面留在原地。
                 entry.previewing = false
-                nav.pop(velocity = velocity)
+                return@PredictiveBackHandler
+            }
+
+            val rawDrag = 1f - lastRawValue
+            val commit = lastProgress <= LandedProgress ||
+                rawDrag >= PredictiveCommitDrag ||
+                velocity <= PredictiveFlingVelocity
+            if (commit) {
+                if (lastProgress <= LandedProgress) nav.completePredictivePop(entry)
+                else nav.pop(velocity = velocity)
+            } else {
+                // 没划到位、也不是有效甩动：弹簧回原位，不触发返回。
+                cancelPreview()
             }
         } catch (cancelled: CancellationException) {
-            // The page has already collapsed onto its card: the system calls that a cancelled
-            // gesture, but there is nothing left to preview, so it goes instead of springing
-            // back open under the finger.
-            if (lastProgress <= LandedProgress && moved) {
+            if (lastProgress <= LandedProgress && previewStarted) {
                 nav.completePredictivePop(entry)
                 return@PredictiveBackHandler
             }
-            // Released early: ease the page back under the finger.
-            withContext(NonCancellable) {
-                coroutineScope {
-                    launch {
-                        entry.progress.animateTo(1f, HigTransition)
-                    }
-                    if (entry.expand) {
-                        launch {
-                            entry.fade.animateTo(1f, HigTransition)
-                        }
-                    }
-                }
-                entry.previewing = false
-            }
+            if (previewStarted) cancelPreview() else entry.previewing = false
             throw cancelled
         }
     }
