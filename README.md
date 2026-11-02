@@ -4,7 +4,7 @@
 
 # Heibo
 
-**第三方微博客户端** · Kotlin + Jetpack Compose · UI 基于 COUI（ColorOS 17 设计语言）
+**第三方微博客户端** · Kotlin + Jetpack Compose · 自研 Heibo 设计语言（液态玻璃 · 对齐 Apple HIG）
 
 > 本仓库基于 [Costben/COBO](https://github.com/Costben/COBO) 二次开发，应用更名为 **Heibo**，
 > 在原作完整的微博功能之上重做了整套 UI 交互。原作的构建方式、功能与文档全部保留，见下文。
@@ -13,7 +13,7 @@
 ![Android](https://img.shields.io/badge/Android-26%2B-3DDC84?logo=android&logoColor=white)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.4-7F52FF?logo=kotlin&logoColor=white)
 ![Compose](https://img.shields.io/badge/Compose-1.11-4285F4?logo=jetpackcompose&logoColor=white)
-![COUI](https://img.shields.io/badge/UI-COUI%20%C2%B7%20ColorOS%2017-111111)
+![Design](https://img.shields.io/badge/Design-Heibo%20%C2%B7%20Liquid%20Glass-111111)
 
 </div>
 
@@ -30,8 +30,8 @@
 
 ## 相比原仓库的改动
 
-在 [Costben/COBO](https://github.com/Costben/COBO) 完整功能的基础上，围绕 **液态玻璃（Liquid Glass）**
-设计语言重做了 UI 与交互，并同步了原仓库 1.0.21 的新功能（微博投票、分类胶囊动效）。
+在 [Costben/COBO](https://github.com/Costben/COBO) 完整功能的基础上，围绕 Heibo 自己的
+**液态玻璃（Liquid Glass）** 设计语言重做了 UI 与交互，并同步了原仓库 1.0.21 的新功能（微博投票、分类胶囊动效）。
 
 **视觉**
 
@@ -59,6 +59,16 @@
 
 - 新图标（黑柴犬）与应用名 **Heibo**，主题图标（单色）同步适配
 
+## 与 COUI 的关系
+
+Heibo 从 COBO + [COUI](https://github.com/suqi8/coui) 起步，但当前版本已经不是「给 COUI 套一层主题」：
+
+- **设计语言属于 Heibo**：液态玻璃材质、边缘光影、顶/底栏、排版、转场都按
+  [`07-设计规范.md`](docs/07-设计规范.md) 重建；COUI 默认的圆钮、玻璃面、导航与菜单视觉大多被替换。
+- **COUI 退到组件底座**：preference、popup、图标、blur 等底层能力继续复用，保留其功能与可及性；
+  本地 `coui/` 是 fork / snapshot，上游更新时以 Heibo 规范为准取舍。
+- 仍然保留 COUI 原生外观的，只剩搜索栏内部取消键这类组件内件（见设计规范）。
+
 ## 特性
 
 - **信息流**：推荐（`containerid=102803`）、关注（`feed/friends`）、好友圈（`feed/circle`），`since_id` / `max_id` 分页，下拉刷新
@@ -77,7 +87,8 @@
 | 层 | 选型 |
 | :--- | :--- |
 | 语言 / UI | Kotlin 2.4 · Jetpack Compose 1.11 |
-| 设计系统 | [COUI](https://github.com/suqi8/coui)（ColorOS 17 组件库，本地快照） |
+| 设计语言 | Heibo（液态玻璃 / Apple HIG，见 [`07-设计规范.md`](docs/07-设计规范.md)） |
+| 组件底座 | [COUI](https://github.com/suqi8/coui)（ColorOS 17 组件库，本地 fork；视觉按 Heibo 规范重绘） |
 | 构建 | AGP 9.3.1 · Gradle 9.8.2 · JDK 21 |
 | 网络 | OkHttp 4.12 |
 | 图片 | Coil 3.6 |
@@ -97,7 +108,7 @@
 ## 目录
 
 ```
-Cobo COUI/
+Heibo/
 ├── frontend/                     # Android 应用（com.cobo.app）
 │   ├── app/                      # 应用模块
 │   │   └── src/main/kotlin/com/cobo/app/
