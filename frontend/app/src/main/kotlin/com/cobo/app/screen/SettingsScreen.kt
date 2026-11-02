@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -65,6 +67,7 @@ import io.github.suqi8.coui.kmp.layout.DialogButtonBarAction
 import io.github.suqi8.coui.kmp.overlay.OverlayDialog
 import io.github.suqi8.coui.kmp.basic.Slider
 import io.github.suqi8.coui.kmp.preference.ArrowPreference
+import io.github.suqi8.coui.kmp.basic.Switch
 import io.github.suqi8.coui.kmp.preference.SwitchPreference
 import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlinx.coroutines.launch
@@ -230,16 +233,35 @@ fun SettingsScreen(nav: NavState) {
                         }
                     }
                     PreferenceDivider()
-                    SwitchPreference(
-                        checked = predictiveBack,
-                        onCheckedChange = {
-                            predictiveBack = it
-                            App.settings.applyPredictiveBack(it)
-                        },
-                        title = "预测性返回手势",
-                        modifier = Modifier.testTag("settings_predictive_back"),
-                        cardListPosition = CardListPosition.Tail,
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("settings_predictive_back")
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                "预测性返回手势",
+                                fontSize = 15.sp,
+                                color = COUITheme.colorScheme.onSurface,
+                            )
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                "关闭时手势完成后才返回；开启时页面跟随手指预览",
+                                fontSize = 12.sp,
+                                color = COUITheme.colorScheme.onSurfaceSecondary,
+                            )
+                        }
+                        Spacer(Modifier.width(12.dp))
+                        Switch(
+                            checked = predictiveBack,
+                            onCheckedChange = {
+                                predictiveBack = it
+                                App.settings.applyPredictiveBack(it)
+                            },
+                        )
+                    }
                 }
             }
 

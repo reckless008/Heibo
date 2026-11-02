@@ -120,11 +120,22 @@ class Settings(context: Context) {
     var inAppUpdate by mutableStateOf(sp.getBoolean("in_app_update", false))
         private set
 
+    // 旧版本默认开启，已经落盘的 true 会覆盖新的默认值；升级到 1.2.4 时强制迁移一次。
+    // 用户之后仍可以在设置里手动重新打开。
+    init {
+        if (!sp.getBoolean("predictive_back_off_migrated", false)) {
+            sp.edit()
+                .putBoolean("predictive_back", false)
+                .putBoolean("predictive_back_off_migrated", true)
+                .apply()
+        }
+    }
+
     /**
-     * 预测性返回手势：返回时页面跟着手指往回收。关掉之后退回普通返回——按一下才走，
-     * 没有跟手的预览动画。默认开。
+     * 预测性返回手势：返回时页面跟着手指往回收。关掉之后退回普通返回——手势完成后才走，
+     * 没有跟手的预览动画。默认关。
      */
-    var predictiveBack by mutableStateOf(sp.getBoolean("predictive_back", true))
+    var predictiveBack by mutableStateOf(sp.getBoolean("predictive_back", false))
 
     /** 玻璃透明度 0..100（越大越透），40 = 标准观感。 */
     var glassAlpha by mutableIntStateOf(sp.getInt("glass_alpha", 40))
