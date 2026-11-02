@@ -156,18 +156,32 @@ fun SettingsScreen(nav: NavState) {
                                 color = COUITheme.colorScheme.onSurfaceSecondary,
                             )
                         }
-                        Slider(
-                            value = fontScale * 100f,
-                            onValueChange = {
-                                val v = it / 100f
-                                fontScale = v
-                                App.settings.applyFontScale(v)
-                            },
-                            valueRange = 80f..140f,
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(start = 8.dp),
-                        )
+                        Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                            Slider(
+                                value = fontScale * 100f,
+                                onValueChange = {
+                                    val v = it / 100f
+                                    fontScale = v
+                                    App.settings.applyFontScale(v)
+                                },
+                                valueRange = 80f..140f,
+                            )
+                            Row(Modifier.fillMaxWidth()) {
+                                Text(
+                                    "小",
+                                    fontSize = 11.sp,
+                                    color = COUITheme.colorScheme.onSurfaceSecondary,
+                                    modifier = Modifier.weight(1f),
+                                )
+                                Text(
+                                    "大",
+                                    fontSize = 11.sp,
+                                    color = COUITheme.colorScheme.onSurfaceSecondary,
+                                    modifier = Modifier.weight(1f),
+                                    textAlign = TextAlign.End,
+                                )
+                            }
+                        }
                     }
                     PreferenceDivider()
                     Row(
@@ -183,8 +197,21 @@ fun SettingsScreen(nav: NavState) {
                                 fontSize = 15.sp,
                                 color = COUITheme.colorScheme.onSurface,
                             )
+                            Text(
+                                "当前 ${glassAlpha}%",
+                                fontSize = 12.sp,
+                                color = COUITheme.colorScheme.onSurfaceSecondary,
+                            )
                         }
                         Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                            Slider(
+                                value = glassAlpha.toFloat(),
+                                onValueChange = {
+                                    glassAlpha = it.toInt()
+                                    App.settings.applyGlassAlpha(it.toInt())
+                                },
+                                valueRange = 0f..100f,
+                            )
                             Row(Modifier.fillMaxWidth()) {
                                 Text(
                                     "轻透磨砂",
@@ -200,14 +227,6 @@ fun SettingsScreen(nav: NavState) {
                                     textAlign = TextAlign.End,
                                 )
                             }
-                            Slider(
-                                value = glassAlpha.toFloat(),
-                                onValueChange = {
-                                    glassAlpha = it.toInt()
-                                    App.settings.applyGlassAlpha(it.toInt())
-                                },
-                                valueRange = 0f..100f,
-                            )
                         }
                     }
                     PreferenceDivider()
@@ -484,7 +503,7 @@ fun SettingsScreen(nav: NavState) {
     if (about) {
         ConfirmDialog(
             title = "关于 Heibo",
-            message = "Heibo v$version\n\n基于 m.weibo.cn Web API 的第三方微博客户端，基于 COUI（ColorOS 17 设计语言）重做整套界面与交互。\n仅用于个人学习与研究。",
+            message = "Heibo v$version\n\n基于 m.weibo.cn Web API 的第三方微博客户端，采用自研 Heibo 设计语言（液态玻璃 · 对齐 Apple HIG），COUI 作为组件底座。\n仅用于个人学习与研究。",
             confirmText = "知道了",
             onDismiss = { about = false },
             onConfirm = { about = false },

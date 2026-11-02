@@ -626,7 +626,7 @@ private fun RouteContent(route: Route, nav: NavState) {
         Route.Nearby -> NearbyScreen(nav)
         is Route.Topic -> TopicScreen(nav, route.name)
         is Route.Images -> ImageViewerScreen(nav, route.urls, route.index)
-        is Route.Video -> VideoScreen(nav, route.url, route.title)
+        is Route.Video -> VideoScreen(nav, route.url, route.title, route.statusId)
         is Route.Vote -> VoteScreen(nav, route.voteId)
     }
 }

@@ -168,7 +168,7 @@ fun NearbyScreen(nav: NavState) {
                     },
                     onUser = { nav.push(Route.Profile(it.id)) },
                     onImage = { urls, i -> nav.push(Route.Images(urls, i)) },
-                    onVideo = { nav.push(Route.Video(it.url, it.title)) },
+                    onVideo = { nav.push(Route.Video(it.url, it.title, status.id)) },
                     onLike = {
                         scope.launch {
                             runCatching { App.repo.like(status.id, status.liked) }.onSuccess {
@@ -180,8 +180,6 @@ fun NearbyScreen(nav: NavState) {
                             }
                         }
                     },
-                    onRepost = { nav.push(Route.Detail(status.id, status.mid), origin) },
-                    onComment = { nav.push(Route.Detail(status.id, status.mid), origin) },
                 )
             }
         }

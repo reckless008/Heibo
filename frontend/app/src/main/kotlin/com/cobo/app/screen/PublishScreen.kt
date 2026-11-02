@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -33,9 +35,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -59,8 +63,6 @@ import io.github.suqi8.coui.kmp.basic.Scaffold
 import io.github.suqi8.coui.kmp.basic.SmallTopAppBar
 import io.github.suqi8.coui.kmp.basic.Text
 import io.github.suqi8.coui.kmp.basic.TextButton
-import io.github.suqi8.coui.kmp.basic.TextField
-import io.github.suqi8.coui.kmp.basic.TextFieldMode
 import io.github.suqi8.coui.kmp.icon.COUIIcons
 import io.github.suqi8.coui.kmp.icon.extended.Add
 import io.github.suqi8.coui.kmp.icon.extended.Close
@@ -150,12 +152,15 @@ fun PublishScreen(nav: NavState, draft: String) {
         },
     ) { padding ->
         val dark = COUITheme.colorScheme.background.luminance() < 0.5f
-        Box(
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .imePadding(),
         ) {
+            // 输入区把「工具栏 + 媒体区」之外的剩余高度吃满：键盘收起时不再留一大块空白，
+            // 键盘弹起时按剩余高度收缩；内容超长/多图由外层滚动承接。
+            val fieldHeight = (maxHeight - 194.dp).coerceAtLeast(160.dp)
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -164,14 +169,13 @@ fun PublishScreen(nav: NavState, draft: String) {
                     // 底部工具条悬浮在内容之上，留出它的高度，滚到底时最后一行才不被压住。
                     .padding(bottom = 76.dp),
             ) {
-                TextField(
+                ComposerField(
                     value = text,
                     onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth().testTag("publish_input"),
-                    label = "分享新鲜事…",
-                    backgroundMode = TextFieldMode.Line,
-                    minLines = 7,
-                    maxLines = 14,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(fieldHeight)
+                        .testTag("publish_input"),
                 )
                 Spacer(Modifier.height(10.dp))
                 if (images.isNotEmpty()) {
@@ -373,5 +377,53 @@ private fun EmojiDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
                 TextButton(text = "关闭", onClick = onDismiss)
             }
         }
+    }
+}
+
+/**
+ * 发布输入区：基础 BasicTextField 默认顶对齐，避免 COUI TextField 在固定高度里把文字/占位符
+ * 垂直居中；底线固定在输入区底部，占位符贴左上，和下方媒体区/工具条形成完整编排。
+ */
+@Composable
+private fun ComposerField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val scheme = COUITheme.colorScheme
+    Box(modifier) {
+        Box(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .height(1.dp)
+                .background(scheme.onSurface.copy(alpha = 0.10f)),
+        )
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(top = 8.dp, bottom = 10.dp),
+            textStyle = TextStyle(
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+                color = scheme.onSurface,
+            ),
+            cursorBrush = SolidColor(scheme.primary),
+            maxLines = 14,
+            decorationBox = { inner ->
+                Box(Modifier.fillMaxSize()) {
+                    if (value.isEmpty()) {
+                        Text(
+                            "分享新鲜事…",
+                            fontSize = 15.sp,
+                            color = scheme.onSurfaceSecondary,
+                        )
+                    }
+                    inner()
+                }
+            },
+        )
     }
 }

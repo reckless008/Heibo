@@ -383,7 +383,7 @@ fun ProfileContent(
                     onOpen = { nav.push(Route.Detail(status.id, status.mid), origin) },
                     onUser = { nav.push(Route.Profile(it.id)) },
                     onImage = { urls, i -> nav.push(Route.Images(urls, i)) },
-                    onVideo = { nav.push(Route.Video(it.url, it.title)) },
+                    onVideo = { nav.push(Route.Video(it.url, it.title, status.id)) },
                     onLike = {
                         scope.launch {
                             runCatching { App.repo.like(status.id, status.liked) }.onSuccess {
@@ -395,8 +395,6 @@ fun ProfileContent(
                             }
                         }
                     },
-                    onRepost = { nav.push(Route.Detail(status.id, status.mid), origin) },
-                    onComment = { nav.push(Route.Detail(status.id, status.mid), origin) },
                     onOpenQuoted = { quoted, quotedOrigin ->
                         quotedOrigin.attachToRow(listState, status.id, topBar)
                         nav.push(Route.Detail(quoted.id, quoted.mid), quotedOrigin)

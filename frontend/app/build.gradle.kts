@@ -61,6 +61,8 @@ dependencies {
     implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.6.3")
     implementation("androidx.media3:media3-exoplayer:1.11.1")
+    // 微博的 stream_url 经常是 HLS（m3u8）：只引核心会把视频当成未知格式，黑屏 00:00。
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
     implementation("androidx.media3:media3-ui:1.11.1")
 
     testImplementation("junit:junit:4.13.2")

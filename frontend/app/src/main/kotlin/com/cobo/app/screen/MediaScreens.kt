@@ -16,6 +16,17 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import io.github.suqi8.coui.kmp.theme.COUITheme
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import com.cobo.app.ui.components.glassCircle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
@@ -114,7 +125,11 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
 import coil3.BitmapImage
 import coil3.compose.AsyncImage
@@ -122,6 +137,8 @@ import coil3.imageLoader
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import coil3.size.Size
+import com.cobo.app.App
+import com.cobo.app.data.Api
 import com.cobo.app.ui.CoboPredictiveBackHandler
 import com.cobo.app.ui.LocalImageOrigins
 import com.cobo.app.ui.LocalRouteTransition
@@ -1015,25 +1032,67 @@ private fun Context.findActivity(): Activity? {
 }
 
 @Composable
-fun VideoScreen(nav: NavState, url: String, title: String) {
+fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = "") {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val audio = remember(context) {
         context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
     }
+    val scope = rememberCoroutineScope()
+    var recovering by remember { mutableStateOf(false) }
     val player = remember(url) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(url))
-            prepare()
-            playWhenReady = true
+        // 微博视频 CDN 会 403 直链请求：跟 API/图片一样带 Web UA 与 m.weibo.cn Referer。
+        val headers = buildMap {
+            put("User-Agent", Api.WEB_UA)
+            put("Referer", "https://m.weibo.cn/")
+            App.repo.cookie()?.takeIf { it.isNotBlank() }?.let { put("Cookie", it) }
         }
+        val dataSource = DefaultHttpDataSource.Factory()
+            .setDefaultRequestProperties(headers)
+        ExoPlayer.Builder(context)
+            .setMediaSourceFactory(DefaultMediaSourceFactory(dataSource))
+            .build()
+            .apply {
+                val p = this
+                // 信息流缓存里的 stream URL 带 Expires 签名，过期后 CDN 403。失败时按 status id
+                // 重新拉一次详情，用新签名换源重试，而不是把黑屏/00:00 丢给用户。
+                addListener(object : Player.Listener {
+                    override fun onPlayerError(error: PlaybackException) {
+                        if (statusId.isNotBlank() && !recovering) {
+                            recovering = true
+                            scope.launch {
+                                val fresh = runCatching {
+                                    App.repo.detail(statusId, force = true)
+                                }.getOrNull()?.video?.url
+                                if (!fresh.isNullOrBlank()) {
+                                    p.setMediaItem(MediaItem.fromUri(fresh))
+                                    p.prepare()
+                                    p.playWhenReady = true
+                                } else {
+                                    App.toast("视频地址已过期，请刷新信息流")
+                                }
+                            }
+                        } else {
+                            App.toast("视频播放失败")
+                        }
+                    }
+                })
+                setMediaItem(MediaItem.fromUri(url))
+                prepare()
+                playWhenReady = true
+            }
     }
 
-    var playerView by remember { mutableStateOf<PlayerView?>(null) }
     var speed by remember { mutableFloatStateOf(1f) }
     var speedMenu by remember { mutableStateOf(false) }
     var hud by remember { mutableStateOf("") }
     var hudTick by remember { mutableIntStateOf(0) }
+    var controlsVisible by remember { mutableStateOf(true) }
+    var isPlaying by remember { mutableStateOf(true) }
+    var position by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var seekFraction by remember { mutableStateOf<Float?>(null) }
+    val scheme = COUITheme.colorScheme
 
     fun flash(text: String) {
         hud = text
@@ -1068,6 +1127,29 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
         onDispose { player.release() }
     }
 
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+
+    LaunchedEffect(player, controlsVisible) {
+        while (controlsVisible) {
+            position = player.currentPosition
+            duration = player.duration.coerceAtLeast(0L)
+            delay(500)
+        }
+    }
+
+    LaunchedEffect(controlsVisible, isPlaying) {
+        if (controlsVisible && isPlaying) {
+            delay(3000)
+            controlsVisible = false
+        }
+    }
+
     CoboPredictiveBackHandler(nav)
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -1075,10 +1157,11 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
             factory = { ctx ->
                 PlayerView(ctx).apply {
                     this.player = player
-                    useController = true
-                }.also { playerView = it }
+                    useController = false
+                }
             },
-            modifier = Modifier.fillMaxSize(),
+            // 让出系统手势条：PlayerView 自带的时间/进度/设置条不会压在手势区里。
+            modifier = Modifier.fillMaxSize().navigationBarsPadding(),
         )
 
         // Gesture surface: left half drags brightness, right half volume, a still finger at 3×,
@@ -1127,15 +1210,7 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
                 .pointerInput(speed, speedMenu) {
                     detectTapGestures(
                         onTap = {
-                            if (speedMenu) {
-                                speedMenu = false
-                            } else {
-                                val view = playerView
-                                if (view != null) {
-                                    if (view.isControllerFullyVisible) view.hideController()
-                                    else view.showController()
-                                }
-                            }
+                            if (speedMenu) speedMenu = false else controlsVisible = !controlsVisible
                         },
                     )
                 }
@@ -1179,6 +1254,29 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
                 },
         )
 
+        if (controlsVisible) {
+            Box(
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .height(140.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)
+                        )
+                    ),
+            )
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f))
+                        )
+                    ),
+            )
         Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
@@ -1186,8 +1284,8 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            GlassIconButton(onClick = { nav.pop() }) {
-                Icon(COUIIcons.Close, "关闭", Modifier, tint = Color.White)
+            VideoGlassButton(40.dp, { nav.pop() }) {
+                Icon(COUIIcons.Close, "关闭", Modifier.size(22.dp), tint = Color.White)
             }
             Text(title, color = Color.White, fontSize = 14.sp, maxLines = 1)
         }
@@ -1237,13 +1335,127 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
                         ) {
                             Text(
                                 text = speedLabel(value),
-                                color = if (selected) Color(0xFF1A8CFF) else Color.White,
+                                color = if (selected) scheme.primary else Color.White,
                                 fontSize = 14.sp,
                             )
                         }
                     }
                 }
             }
+        }
+
+
+        Row(
+            modifier = Modifier.align(Alignment.Center),
+            horizontalArrangement = Arrangement.spacedBy(22.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            VideoGlassButton(40.dp, {
+                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+            }) {
+                VideoIcon(androidx.media3.ui.R.drawable.exo_icon_rewind, "后退 10 秒", 22.dp)
+            }
+            VideoGlassButton(60.dp, {
+                if (isPlaying) player.pause() else player.play()
+            }) {
+                VideoIcon(
+                    if (isPlaying) androidx.media3.ui.R.drawable.exo_icon_pause
+                    else androidx.media3.ui.R.drawable.exo_icon_play,
+                    if (isPlaying) "暂停" else "播放",
+                    26.dp,
+                )
+            }
+            VideoGlassButton(40.dp, {
+                player.seekTo(player.currentPosition + 10_000L)
+            }) {
+                VideoIcon(androidx.media3.ui.R.drawable.exo_icon_fastforward, "前进 10 秒", 22.dp)
+            }
+        }
+
+        Column(
+            Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+        ) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(26.dp)
+                    .pointerInput(duration) {
+                        detectTapGestures { offset ->
+                            if (duration > 0L) {
+                                player.seekTo((offset.x / size.width * duration).toLong())
+                            }
+                        }
+                    }
+                    .pointerInput(duration) {
+                        detectHorizontalDragGestures(
+                            onDragStart = { offset ->
+                                if (duration > 0L) {
+                                    seekFraction = (offset.x / size.width).coerceIn(0f, 1f)
+                                }
+                            },
+                            onHorizontalDrag = { change, _ ->
+                                if (duration > 0L) {
+                                    seekFraction = (change.position.x / size.width).coerceIn(0f, 1f)
+                                    change.consume()
+                                }
+                            },
+                            onDragEnd = {
+                                val f = seekFraction
+                                seekFraction = null
+                                if (f != null && duration > 0L) {
+                                    player.seekTo((f * duration).toLong())
+                                }
+                            },
+                            onDragCancel = { seekFraction = null },
+                        )
+                    },
+            ) {
+                Canvas(Modifier.fillMaxSize()) {
+                    val y = size.height / 2f
+                    val fraction = (seekFraction ?: if (duration > 0L) {
+                        position.toFloat() / duration
+                    } else {
+                        0f
+                    }).coerceIn(0f, 1f)
+                    drawLine(
+                        color = Color.White.copy(alpha = 0.28f),
+                        start = Offset(0f, y),
+                        end = Offset(size.width, y),
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        color = Color.White,
+                        start = Offset(0f, y),
+                        end = Offset(size.width * fraction, y),
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                    drawCircle(
+                        Color.White,
+                        radius = 5.dp.toPx(),
+                        center = Offset(size.width * fraction, y),
+                    )
+                }
+            }
+            Row(Modifier.fillMaxWidth()) {
+                Text(
+                    videoTime(seekFraction?.let { (it * duration).toLong() } ?: position),
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    videoTime(duration),
+                    color = Color.White.copy(alpha = 0.8f),
+                    fontSize = 11.sp,
+                )
+            }
+        }
         }
 
         if (hud.isNotEmpty()) {
@@ -1259,4 +1471,36 @@ fun VideoScreen(nav: NavState, url: String, title: String) {
             )
         }
     }
+}
+
+@Composable
+private fun VideoGlassButton(
+    size: Dp,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    Box(
+        Modifier
+            .size(size)
+            // 亮画面上玻璃会发白，白图标对比不足；先压一层深色底再叠玻璃。
+            .background(Color.Black.copy(alpha = 0.35f), CircleShape)
+            .glassCircle(dark = true)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) { content() }
+}
+
+@Composable
+private fun VideoIcon(resId: Int, description: String, size: Dp) {
+    Image(
+        painter = painterResource(resId),
+        contentDescription = description,
+        modifier = Modifier.size(size),
+        colorFilter = ColorFilter.tint(Color.White),
+    )
+}
+
+private fun videoTime(ms: Long): String {
+    val total = (ms / 1000).coerceAtLeast(0)
+    return "%02d:%02d".format(total / 60, total % 60)
 }

@@ -318,6 +318,77 @@ fun Modifier.glassLens(
     )
 
 /**
+ * 圆形玻璃钮的专用绘制。
+ *
+ * 圆钮不能走 `background + clip(CircleShape)`：部分渲染器会把圆形 clip 的路径近似成八边形，
+ * 圆钮里就浮出一圈八边形的亮面。这里直接用 drawCircle 画填充、发丝边、色散内边和顶部高光，
+ * 不依赖 clip，形状始终是真圆；四层参数与 [glassEdgeLight] 同源。
+ */
+fun Modifier.glassCircle(dark: Boolean): Modifier = this
+    .drawBehind {
+        val w = 1.dp.toPx()
+        val r = size.minDimension / 2f
+        val inset = 1.6.dp.toPx()
+        drawCircle(
+            color = if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF),
+            radius = r,
+        )
+        // 外缘：方向性受光发丝边。
+        drawCircle(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    if (dark) Color.White.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.95f),
+                    if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
+                ),
+                startY = 0f,
+                endY = size.height,
+            ),
+            radius = r - w / 2f,
+            style = Stroke(w),
+        )
+        // 内缘：冷暖色散折射。
+        drawCircle(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color(0xFFA8C8FF).copy(alpha = if (dark) 0.16f else 0.22f),
+                    Color(0xFFFFD9A8).copy(alpha = if (dark) 0.12f else 0.18f),
+                ),
+                startY = 0f,
+                endY = size.height,
+            ),
+            radius = r - inset - w / 2f,
+            style = Stroke(w),
+        )
+        // 顶部高光：用圆形渐变而不是裁一个矩形，避免再依赖 clip。
+        drawCircle(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.White.copy(alpha = if (dark) 0.26f else 0.6f),
+                    Color.White.copy(alpha = 0f),
+                ),
+                startY = 0f,
+                endY = size.height * 0.5f,
+            ),
+            radius = r,
+        )
+        // 底缘暗折边。
+        drawCircle(
+            brush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    Color.Black.copy(alpha = if (dark) 0.2f else 0.08f),
+                ),
+                startY = size.height * 0.45f,
+                endY = size.height,
+            ),
+            radius = r - w / 2f,
+            style = Stroke(w),
+        )
+    }
+    // 不再叠 Modifier.shadow：CircleShape 的 RenderNode 阴影轮廓在部分渲染器上会被近似成
+    // 八边形，并盖在填充上（clip = false 也挡不住）。圆钮的区分度交给边缘光影与发丝边。
+
+/**
  * 玻璃圆形图标钮：与导航栏同一套玻璃透镜材质（40dp 圆、按下回弹），
  * 顶栏搜索 / 发布用它，替换 COUI 的径向渐变圆钮。
  */
@@ -344,8 +415,7 @@ fun GlassIconButton(
                 scaleX = scale
                 scaleY = scale
             }
-            .clip(CircleShape)
-            .glassLens(CircleShape, isDark)
+            .glassCircle(isDark)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,

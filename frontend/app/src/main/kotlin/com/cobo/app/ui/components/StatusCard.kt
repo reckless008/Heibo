@@ -93,12 +93,16 @@ fun StatusCard(
     showActions: Boolean = true,
     /** 只读流（本地关注、纯本地模式）：计数照常显示，但点赞 / 评论 / 转发都不响应。 */
     actionsEnabled: Boolean = !App.repo.guest,
-    onRepost: () -> Unit = {},
-    onComment: () -> Unit = {},
     /** Opens the quoted post when it is tapped; the frame grows from and returns into that block. */
     onOpenQuoted: ((Status, ExpandOrigin) -> Unit)? = null,
 ) {
     val scheme = COUITheme.colorScheme
+    // 转发/评论在卡片内直接完成，不再要求先进详情页；计数先本地加一，
+    // 下次刷新由接口校准。status 变化（点赞、刷新）时重置。
+    var shown by remember(status) { mutableStateOf(status) }
+    var repostDialog by remember { mutableStateOf(false) }
+    var commentDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
     Card(
         modifier = modifier.fillMaxWidth(),
         insideMargin = PaddingValues(horizontal = 14.dp, vertical = 12.dp),
@@ -138,29 +142,69 @@ fun StatusCard(
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
-                // 胶囊自适应收窄，两端仍对齐图片左右边缘，中间留白自然分开。
+                // 两端对齐图片左右边缘，中间留白自然分开。
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 GlassActionPill(
                     icon = CoboIcons.Repost,
-                    text = fmtCount(status.reposts),
-                    onClick = onRepost,
+                    text = fmtCount(shown.reposts),
+                    onClick = { repostDialog = true },
                     enabled = actionsEnabled,
                 )
                 GlassActionPill(
                     icon = CoboIcons.Comment,
-                    text = fmtCount(status.comments),
-                    onClick = onComment,
+                    text = fmtCount(shown.comments),
+                    onClick = { commentDialog = true },
                     enabled = actionsEnabled,
                 )
                 GlassActionPill(
-                    icon = if (status.liked) CoboIcons.HeartFill else CoboIcons.Heart,
-                    text = fmtCount(status.attitudes),
+                    icon = if (shown.liked) CoboIcons.HeartFill else CoboIcons.Heart,
+                    text = fmtCount(shown.attitudes),
                     onClick = onLike,
-                    tint = if (status.liked) scheme.primary else scheme.onSurfaceSecondary,
+                    tint = if (shown.liked) scheme.primary else scheme.onSurfaceSecondary,
                     enabled = actionsEnabled,
                 )
             }
+        }
+        if (repostDialog) {
+            InputDialog(
+                title = "转发",
+                hint = "说点什么",
+                onDismiss = { repostDialog = false },
+                onConfirm = { text ->
+                    repostDialog = false
+                    scope.launch {
+                        runCatching {
+                            App.repo.repost(status.id, status.mid.ifBlank { status.id }, text)
+                        }.onSuccess {
+                            shown = shown.copy(reposts = shown.reposts + 1)
+                            App.toast("已转发")
+                        }.onFailure {
+                            App.toast(it.message ?: "转发失败")
+                        }
+                    }
+                },
+            )
+        }
+        if (commentDialog) {
+            InputDialog(
+                title = "评论",
+                hint = "写评论",
+                onDismiss = { commentDialog = false },
+                onConfirm = { text ->
+                    commentDialog = false
+                    scope.launch {
+                        runCatching {
+                            App.repo.comment(status.id, status.mid.ifBlank { status.id }, text)
+                        }.onSuccess {
+                            shown = shown.copy(comments = shown.comments + 1)
+                            App.toast("评论成功")
+                        }.onFailure {
+                            App.toast(it.message ?: "评论失败")
+                        }
+                    }
+                },
+            )
         }
     }
 }
