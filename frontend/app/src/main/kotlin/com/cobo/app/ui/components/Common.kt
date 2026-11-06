@@ -1,5 +1,7 @@
 package com.cobo.app.ui.components
 
+import kotlin.math.min
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -24,6 +26,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -63,6 +66,7 @@ import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.blur
 import io.github.suqi8.coui.kmp.blur.colorControls
 import io.github.suqi8.coui.kmp.blur.drawBackdrop
+import io.github.suqi8.coui.kmp.blur.runtimeShaderEffect
 import io.github.suqi8.coui.kmp.basic.ButtonDefaults
 import io.github.suqi8.coui.kmp.basic.CircularProgressIndicator
 import io.github.suqi8.coui.kmp.basic.FullPagePullToRefreshTexts
@@ -235,65 +239,93 @@ fun ActionIcon(
 }
 
 /**
- * 玻璃边缘光影：方向性受光发丝边 + 冷暖色散折射内边 + 顶部高光带 + 底缘暗折边。
- * 所有玻璃件（透镜、指示块、查看器控件）共用这一圈绘制——边缘光影是玻璃与背景的区分度来源。
+ * 玻璃边缘光影：一条受光发丝边 + 顶部受光 + 底缘收光。
+ *
+ * 折射不再用第二道 1dp 描边表达：原来的「1.6dp 内缩色散线」放大看就是第二圈轮廓，
+ * 和底缘暗折线一起读成「双层」。冷暖色相直接混进唯一那条外缘的渐变里，内缘折光交给
+ * 向内的柔光/暗折，边界始终只有一条。
+ *
+ * [lens] 为选中透镜：透镜嵌在容器玻璃里，边界由容器负责；透镜只保留内部受光，
+ * 不再另画一圈边，避免容器边缘 + 透镜边缘叠成双线。
  */
-fun Modifier.glassEdgeLight(dark: Boolean): Modifier = this.drawBehind {
+fun Modifier.glassEdgeLight(dark: Boolean, lens: Boolean = false): Modifier = this.drawBehind {
         val w = 1.dp.toPx()
         val r = size.minDimension / 2f
-        fun edge(inset: Float, brush: Brush) {
+        if (!lens) {
+            // 唯一的外缘：顶亮、中段冷暖色散、底暗；一条线完成受光 + 色相。
             drawRoundRect(
-                brush = brush,
-                cornerRadius = CornerRadius(r - inset - w / 2f),
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        if (dark) Color.White.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.95f),
+                        Color(0xFFA8C8FF).copy(alpha = if (dark) 0.14f else 0.20f),
+                        Color(0xFFFFD9A8).copy(alpha = if (dark) 0.10f else 0.16f),
+                        if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
+                    ),
+                    startY = 0f,
+                    endY = size.height,
+                ),
+                cornerRadius = CornerRadius(r - w / 2f),
                 style = Stroke(w),
-                topLeft = Offset(inset + w / 2f, inset + w / 2f),
-                size = Size(size.width - 2 * inset - w, size.height - 2 * inset - w),
+                topLeft = Offset(w / 2f, w / 2f),
+                size = Size(size.width - w, size.height - w),
             )
         }
-        // 外缘：方向性受光——顶亮底暗的发丝边（光从上方来）。
-        edge(
-            0f,
-            Brush.verticalGradient(
-                colors = listOf(
-                    if (dark) Color.White.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.95f),
-                    if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
-                ),
-                startY = 0f,
-                endY = size.height,
-            ),
-        )
-        // 内缘：色散折射——冷暖各一丝的第二道光边，模拟厚玻璃边缘的折光。
-        edge(
-            1.6.dp.toPx(),
-            Brush.verticalGradient(
-                colors = listOf(
-                    Color(0xFFA8C8FF).copy(alpha = if (dark) 0.16f else 0.22f),
-                    Color(0xFFFFD9A8).copy(alpha = if (dark) 0.12f else 0.18f),
-                ),
-                startY = 0f,
-                endY = size.height,
-            ),
-        )
-        // 顶部高光带（光效）。
+        // 倒角：贴近边缘的窄柔光，不是铺满半个表面的白雾。
+        // 参考 Glasswork 的 box-shadow bevel：顶部 6px 白 0.5、左右 4px 0.22/0.12、底部 6px 黑 0.06。
+        val bevelTop = min(6.dp.toPx(), size.height * 0.2f)
+        val bevelSide = min(5.dp.toPx(), size.width * 0.15f)
+        val bevelBottom = min(6.dp.toPx(), size.height * 0.2f)
         drawRect(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color.White.copy(alpha = if (dark) 0.26f else 0.6f),
-                    Color.White.copy(alpha = 0f),
+                    Color.White.copy(
+                        alpha = when {
+                            dark -> 0.26f
+                            lens -> 0.32f
+                            else -> 0.5f
+                        }
+                    ),
+                    Color.Transparent,
                 ),
                 startY = 0f,
-                endY = size.height * 0.5f,
+                endY = bevelTop,
             ),
         )
-        // 底缘暗折边：向下渐显，只咬住下缘。
-        edge(
-            0f,
-            Brush.verticalGradient(
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colorStops = arrayOf(
+                    0f to Color.White.copy(
+                        alpha = when {
+                            dark -> 0.10f
+                            lens -> 0.12f
+                            else -> 0.2f
+                        }
+                    ),
+                    (bevelSide / size.width).coerceIn(0f, 0.45f) to Color.Transparent,
+                    (1f - bevelSide / size.width).coerceIn(0.55f, 1f) to Color.Transparent,
+                    1f to Color.White.copy(
+                        alpha = when {
+                            dark -> 0.05f
+                            lens -> 0.06f
+                            else -> 0.1f
+                        }
+                    ),
+                ),
+            ),
+        )
+        drawRect(
+            brush = Brush.verticalGradient(
                 colors = listOf(
                     Color.Transparent,
-                    Color.Black.copy(alpha = if (dark) 0.2f else 0.08f),
+                    Color.Black.copy(
+                        alpha = when {
+                            dark -> 0.10f
+                            lens -> 0.04f
+                            else -> 0.06f
+                        }
+                    ),
                 ),
-                startY = size.height * 0.45f,
+                startY = size.height - bevelBottom,
                 endY = size.height,
             ),
         )
@@ -308,7 +340,7 @@ fun Modifier.glassLens(
     dark: Boolean,
     shadowElevation: Dp = 3.dp,
 ): Modifier = this
-    .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
+    .background(glassLensFill(dark))
     .glassEdgeLight(dark)
     .shadow(
         elevation = shadowElevation,
@@ -321,23 +353,24 @@ fun Modifier.glassLens(
  * 圆形玻璃钮的专用绘制。
  *
  * 圆钮不能走 `background + clip(CircleShape)`：部分渲染器会把圆形 clip 的路径近似成八边形，
- * 圆钮里就浮出一圈八边形的亮面。这里直接用 drawCircle 画填充、发丝边、色散内边和顶部高光，
- * 不依赖 clip，形状始终是真圆；四层参数与 [glassEdgeLight] 同源。
+ * 圆钮里就浮出一圈八边形的亮面。这里直接用 drawCircle 画填充、唯一一条受光边、顶部受光和
+ * 底缘收光，不依赖 clip，形状始终是真圆；边界参数与 [glassEdgeLight] 同源。
  */
 fun Modifier.glassCircle(dark: Boolean): Modifier = this
     .drawBehind {
         val w = 1.dp.toPx()
         val r = size.minDimension / 2f
-        val inset = 1.6.dp.toPx()
         drawCircle(
-            color = if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF),
+            color = glassLensFill(dark),
             radius = r,
         )
-        // 外缘：方向性受光发丝边。
+        // 唯一外缘：顶亮、中段冷暖色散、底暗；色相混在这一条线里，不另画内圈。
         drawCircle(
             brush = Brush.verticalGradient(
                 colors = listOf(
                     if (dark) Color.White.copy(alpha = 0.42f) else Color.White.copy(alpha = 0.95f),
+                    Color(0xFFA8C8FF).copy(alpha = if (dark) 0.14f else 0.20f),
+                    Color(0xFFFFD9A8).copy(alpha = if (dark) 0.10f else 0.16f),
                     if (dark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.06f),
                 ),
                 startY = 0f,
@@ -346,43 +379,42 @@ fun Modifier.glassCircle(dark: Boolean): Modifier = this
             radius = r - w / 2f,
             style = Stroke(w),
         )
-        // 内缘：冷暖色散折射。
+        // 倒角：与胶囊同源的窄柔光，不铺满半个圆。
+        val bevelTop = min(6.dp.toPx(), size.height * 0.2f)
+        val bevelSide = min(5.dp.toPx(), size.width * 0.15f)
+        val bevelBottom = min(6.dp.toPx(), size.height * 0.2f)
         drawCircle(
             brush = Brush.verticalGradient(
                 colors = listOf(
-                    Color(0xFFA8C8FF).copy(alpha = if (dark) 0.16f else 0.22f),
-                    Color(0xFFFFD9A8).copy(alpha = if (dark) 0.12f else 0.18f),
-                ),
-                startY = 0f,
-                endY = size.height,
-            ),
-            radius = r - inset - w / 2f,
-            style = Stroke(w),
-        )
-        // 顶部高光：用圆形渐变而不是裁一个矩形，避免再依赖 clip。
-        drawCircle(
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    Color.White.copy(alpha = if (dark) 0.26f else 0.6f),
+                    Color.White.copy(alpha = if (dark) 0.26f else 0.5f),
                     Color.White.copy(alpha = 0f),
                 ),
                 startY = 0f,
-                endY = size.height * 0.5f,
+                endY = bevelTop,
             ),
             radius = r,
         )
-        // 底缘暗折边。
+        drawCircle(
+            brush = Brush.horizontalGradient(
+                colorStops = arrayOf(
+                    0f to Color.White.copy(alpha = if (dark) 0.10f else 0.2f),
+                    (bevelSide / size.width).coerceIn(0f, 0.45f) to Color.Transparent,
+                    (1f - bevelSide / size.width).coerceIn(0.55f, 1f) to Color.Transparent,
+                    1f to Color.White.copy(alpha = if (dark) 0.05f else 0.1f),
+                ),
+            ),
+            radius = r,
+        )
         drawCircle(
             brush = Brush.verticalGradient(
                 colors = listOf(
                     Color.Transparent,
-                    Color.Black.copy(alpha = if (dark) 0.2f else 0.08f),
+                    Color.Black.copy(alpha = if (dark) 0.10f else 0.06f),
                 ),
-                startY = size.height * 0.45f,
+                startY = size.height - bevelBottom,
                 endY = size.height,
             ),
-            radius = r - w / 2f,
-            style = Stroke(w),
+            radius = r,
         )
     }
     // 不再叠 Modifier.shadow：CircleShape 的 RenderNode 阴影轮廓在部分渲染器上会被近似成
@@ -484,7 +516,11 @@ fun glassPlate(dark: Boolean): Color =
 
 /** 导航栏胶囊的底色浓度：更透一点，苹果风靠边缘和折射说话，不靠色块。 */
 fun glassPlateAlpha(dark: Boolean): Float =
-    ((if (dark) 0.32f else 0.42f) * glassAlphaFactor()).coerceIn(0.05f, 0.92f)
+    ((if (dark) 0.26f else 0.16f) * glassAlphaFactor()).coerceIn(0.04f, 0.92f)
+
+/** 选中透镜/圆钮的填充：比容器亮一档，但仍是玻璃而不是白色实心块。 */
+fun glassLensFill(dark: Boolean): Color =
+    if (dark) Color(0x24FFFFFF) else Color(0x4DFFFFFF)
 
 /**
  * 设置 → 显示与交互 → 玻璃透明度 的映射：40 = 标准（系数 1），数值越大玻璃越透。
@@ -499,6 +535,51 @@ fun glassAlphaFactor(): Float = (1.4f - App.settings.glassAlpha / 100f).coerceIn
  * couiGlassSurface 系会丢弃排在前面的 modifier，这里直接走 drawBackdrop，
  * 尺寸 / 位置 / 内边距接在调用之后即可。
  */
+/** 边缘透镜：Glasswork 的 rim lens。把模糊后的背景在边缘向内侧偏移，R/B 各多/少一点形成色散。 */
+private const val GLASS_LENS_SHADER = """
+uniform shader child;
+uniform float2 in_size;
+uniform float in_padding;
+uniform float in_radius;
+uniform float in_rim;
+uniform float in_edge;
+uniform float in_power;
+uniform float in_dispersion;
+
+float sdRoundRect(float2 p, float2 b, float r) {
+    float2 q = abs(p) - b + r;
+    return min(max(q.x, q.y), 0.0) + length(max(q, 0.0)) - r;
+}
+
+half4 main(float2 coord) {
+    float2 size = in_size;
+    float2 center = size * 0.5 + float2(in_padding);
+    float2 p = coord - center;
+    float2 b = size * 0.5 - float2(0.5);
+    float r = min(in_radius, min(b.x, b.y));
+    float d = sdRoundRect(p, b, r);
+    float inside = max(-d, 0.0);
+    float t = clamp(inside / max(in_rim, 0.001), 0.0, 1.0);
+    float fall = pow(1.0 - t, in_power);
+    float2 gx = float2(
+        sdRoundRect(p + float2(0.5, 0.0), b, r) - d,
+        sdRoundRect(p + float2(0.0, 0.5), b, r) - d
+    );
+    float2 dir = normalize(gx + float2(0.0001));
+    float off = in_rim * in_edge * fall;
+    float2 uvR = coord - dir * (off * (1.0 + in_dispersion));
+    float2 uvG = coord - dir * off;
+    float2 uvB = coord - dir * (off * (1.0 - in_dispersion));
+    half4 cR = child.eval(uvR);
+    half4 cG = child.eval(uvG);
+    half4 cB = child.eval(uvB);
+    return half4(cR.r, cG.g, cB.b, cG.a);
+}
+"""
+
+/** 路由转场/预测性返回进行中：玻璃暂停 backdrop 采样与折射，避免每帧重跑重效果。 */
+val LocalNavMotion = compositionLocalOf { false }
+
 @Composable
 fun Modifier.liquidGlass(
     shape: Shape,
@@ -506,18 +587,41 @@ fun Modifier.liquidGlass(
     alpha: Float,
     highlightAlpha: Float = 1f,
     /** 模糊半径（px）：大表面用更强的模糊读作「更厚的材质」（Apple Design §12）。 */
-    blurRadius: Float = 44f,
+    blurRadius: Float = 12f,
 ): Modifier {
     val backdrop = LocalBackdrop.current
-    if (backdrop == null) return Modifier.background(tint.copy(alpha = alpha), shape)
+    val motion = LocalNavMotion.current
+    if (backdrop == null || motion) return Modifier.background(tint.copy(alpha = alpha), shape)
     val highlight = rememberGlassHighlight(GlassContainer.Small, backdrop)?.copy(alpha = highlightAlpha)
+    val dark = tint.luminance() < 0.5f
     return Modifier
         .drawBackdrop(
             backdrop = backdrop,
             shape = { shape },
+            // Glasswork 的核心不是把背景糊白：2px 级轻模糊 + 高饱和 + 亮度，
+            // 让玻璃取背后的颜色；这里按设备像素取 12px（底栏 16px）。
             effects = {
                 blur(blurRadius)
-                colorControls(saturation = 1.22f)
+                colorControls(
+                    brightness = if (dark) -0.2f else 0.06f,
+                    saturation = if (dark) 1.6f else 1.8f,
+                )
+                // 边缘折射：Glasswork 的 rim lens。必须在 blur/colorControls 之后，
+                // 采样的是已经处理好色调的 backdrop。
+                runtimeShaderEffect("HeiboGlassLens", GLASS_LENS_SHADER, "child") {
+                    val ds = downscaleFactor.coerceAtLeast(1).toFloat()
+                    val w = size.width / ds
+                    val h = size.height / ds
+                    val radius = min(w, h) / 2f
+                    val rim = min(min(w, h) * 0.42f, 44.dp.toPx() / ds)
+                    setFloatUniform("in_size", w, h)
+                    setFloatUniform("in_padding", padding / ds)
+                    setFloatUniform("in_radius", radius)
+                    setFloatUniform("in_rim", rim)
+                    setFloatUniform("in_edge", 1.1f)
+                    setFloatUniform("in_power", 2.6f)
+                    setFloatUniform("in_dispersion", 0.15f)
+                }
             },
             highlight = { highlight },
         )
@@ -555,12 +659,9 @@ fun GlassActionPill(
     val color = if (enabled) tint else tint.copy(alpha = 0.38f)
     Row(
         modifier = modifier
-            .liquidGlass(
-                shape = shape,
-                tint = glassPlate(isDark),
-                alpha = plateAlpha,
-                highlightAlpha = 1f,
-            )
+            // 动作小胶囊是规范里的例外件：不采样背景（否则每张卡 3 枚 blur + 折射，
+            // 列表滑动/转场时非常贵），只保留半透玻璃底 + 发丝边。
+            .background(glassPlate(isDark).copy(alpha = plateAlpha), shape)
             // 固定尺寸：三枚等宽，不随计数长短变形。
             .width(96.dp)
             .graphicsLayer {

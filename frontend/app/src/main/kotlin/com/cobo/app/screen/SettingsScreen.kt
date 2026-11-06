@@ -1,5 +1,7 @@
 package com.cobo.app.screen
 
+import android.os.Build
+
 import android.webkit.CookieManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -525,7 +527,7 @@ fun SettingsScreen(nav: NavState) {
     if (about) {
         ConfirmDialog(
             title = "关于 Heibo",
-            message = "Heibo v$version\n\n基于 m.weibo.cn Web API 的第三方微博客户端，采用自研 Heibo 设计语言（液态玻璃 · 对齐 Apple HIG），COUI 作为组件底座。\n仅用于个人学习与研究。",
+            message = "Heibo v$version\n\n设备型号：${Build.MANUFACTURER} ${Build.MODEL}\n\n基于 m.weibo.cn Web API 的第三方微博客户端，采用自研 Heibo 设计语言（液态玻璃 · 对齐 Apple HIG），COUI 作为组件底座。\n仅用于个人学习与研究。",
             confirmText = "知道了",
             onDismiss = { about = false },
             onConfirm = { about = false },

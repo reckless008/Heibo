@@ -57,6 +57,19 @@ fun CoboTheme(content: @Composable () -> Unit) {
                 primaryVariant = toned(Color(0xFF1A8CFF)),
                 primaryContainer = toned(Color(0xFF1A8CFF)),
                 onTertiaryContainer = toned(Color(0xFF1A8CFF)),
+                // Apple HIG 深色层级：基底黑 → 卡片 → 浮起 → 最高，分隔线单独一档。
+                // 旧版页面 #1E1E1E + 卡片 10% 白（#353535）层级偏亮且转发块与卡片同色。
+                background = Color(0xFF000000),
+                onBackground = Color(0xEBFFFFFF),
+                surface = Color(0xFF000000),
+                onSurface = Color(0xEBFFFFFF),
+                onSurfaceSecondary = Color(0x99FFFFFF),
+                surfaceContainer = Color(0xFF1C1C1E),
+                onSurfaceContainer = Color(0xEBFFFFFF),
+                surfaceContainerHigh = Color(0xFF2C2C2E),
+                surfaceContainerHighest = Color(0xFF3A3A3C),
+                outline = Color(0xFF38383A),
+                dividerLine = Color(0xFF38383A),
             ),
         )
     }

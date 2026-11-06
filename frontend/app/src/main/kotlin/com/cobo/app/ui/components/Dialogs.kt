@@ -1,5 +1,25 @@
 package com.cobo.app.ui.components
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import coil3.compose.AsyncImage
+import com.cobo.app.ui.CoboIcons
+import io.github.suqi8.coui.kmp.basic.Icon
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.Close
+import io.github.suqi8.coui.kmp.icon.extended.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -412,5 +432,163 @@ fun UserRow(user: User, onClick: () -> Unit, subtitle: String = "") {
             }
         }
         TextButton(text = "查看", onClick = onClick)
+    }
+}
+
+private val WEIBO_EMOJIS = listOf(
+    "微笑", "嘻嘻", "哈哈", "可爱", "爱你", "亲亲", "挤眼", "馋嘴", "抓狂", "困",
+    "晕", "衰", "思考", "嘘", "生病", "酷", "怒", "汗", "失望", "可怜",
+    "吐", "泪", "打脸", "赞", "踩", "握手", "耶", "拳头", "抱拳", "作揖",
+    "干杯", "吃瓜", "围观", "允悲", "跪了", "给力", "威武", "加油", "心", "伤心",
+    "心碎", "玫瑰", "礼物", "蛋糕", "蜡烛", "太阳", "月亮", "星星", "彩虹", "咖啡",
+    "话筒", "音乐", "电影", "相机", "手机", "电脑", "飞机", "汽车", "房子", "红包",
+)
+
+/**
+ * 评论/转发/回复共用的编辑器：文本 + 图片 + 微博表情 + @ + 话题。
+ * 微博表情插入的是服务端约定的 [名称] 码，发表后由微博渲染成官方表情。
+ */
+@Composable
+fun ComposerDialog(
+    title: String,
+    hint: String,
+    initial: String = "",
+    confirmText: String = "发送",
+    allowImage: Boolean = false,
+    maxLength: Int = 140,
+    onDismiss: () -> Unit,
+    onSend: (String, Uri?) -> Unit,
+) {
+    var text by remember { mutableStateOf(initial) }
+    var image by remember { mutableStateOf<Uri?>(null) }
+    var emojiOpen by remember { mutableStateOf(false) }
+    var show by remember { mutableStateOf(false) }
+    var settled by remember { mutableStateOf(false) }
+    var sent by remember { mutableStateOf(false) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { image = it }
+    LaunchedEffect(Unit) { show = true }
+
+    OverlayDialog(
+        show = show,
+        title = title,
+        outsideMargin = DpSize(16.dp, 8.dp),
+        onDismissRequest = { show = false },
+        onDismissFinished = {
+            if (!settled) {
+                settled = true
+                if (!sent) onDismiss()
+            }
+        },
+    ) {
+        Column {
+            TextField(
+                value = text,
+                onValueChange = { if (it.length <= maxLength) text = it },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp),
+                label = hint,
+                backgroundMode = TextFieldMode.Rectangle,
+                maxLines = 6,
+                minLines = 3,
+            )
+            if (image != null) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    AsyncImage(
+                        model = image,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(RoundedCornerShape(10.dp)),
+                    )
+                    Box(
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .size(20.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.55f))
+                            .clickable { image = null },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(COUIIcons.Close, null, tint = Color.White, modifier = Modifier.size(13.dp))
+                    }
+                }
+            }
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (allowImage) {
+                    ActionIcon(COUIIcons.Image, "图片", onClick = {
+                        picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    })
+                }
+                ActionIcon(CoboIcons.Emoji, "表情", onClick = { emojiOpen = true })
+                ActionIcon(CoboIcons.At, "提到", onClick = { text += "@" })
+                ActionIcon(CoboIcons.Topic, "话题", onClick = { text += "##" })
+                Spacer(Modifier.weight(1f))
+                Text("${text.length}/$maxLength", fontSize = 12.sp, color = COUITheme.colorScheme.onSurfaceSecondary)
+            }
+            DialogButtonBar(
+                negative = DialogButtonBarAction(text = "取消", onClick = { show = false }),
+                positive = DialogButtonBarAction(
+                    text = confirmText,
+                    enabled = text.isNotBlank() || image != null,
+                    onClick = {
+                        sent = true
+                        show = false
+                        onSend(text, image)
+                    },
+                ),
+            )
+        }
+    }
+
+    if (emojiOpen) {
+        WeiboEmojiDialog(onDismiss = { emojiOpen = false }, onPick = { text += it })
+    }
+}
+
+@Composable
+private fun WeiboEmojiDialog(onDismiss: () -> Unit, onPick: (String) -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(24.dp)
+                .clip(RoundedCornerShape(20.dp))
+                .background(COUITheme.colorScheme.surfaceContainer)
+                .padding(10.dp),
+        ) {
+            Column(
+                Modifier
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
+            ) {
+                WEIBO_EMOJIS.chunked(6).forEach { row ->
+                    Row(Modifier.fillMaxWidth()) {
+                        row.forEach { name ->
+                            Box(
+                                Modifier
+                                    .weight(1f)
+                                    .padding(vertical = 8.dp)
+                                    .clickable { onPick("[$name]") },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                Text(name, fontSize = 13.sp, color = COUITheme.colorScheme.onSurface)
+                            }
+                        }
+                        repeat(6 - row.size) { Spacer(Modifier.weight(1f)) }
+                    }
+                }
+            }
+        }
     }
 }

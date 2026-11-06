@@ -946,12 +946,11 @@ class Repo(private val context: Context, private val store: Store) {
         return true
     }
 
-    suspend fun comment(id: String, mid: String, text: String): Boolean {
+    suspend fun comment(id: String, mid: String, text: String, picId: String? = null): Boolean {
         // The mobile endpoint takes the body as `content`; `comment` gets rejected as 100013 参数缺失.
-        val ok = postOk(
-            "https://m.weibo.cn/api/comments/create",
-            mapOf("id" to id, "mid" to mid.ifBlank { id }, "content" to text),
-        )
+        val form = linkedMapOf("id" to id, "mid" to mid.ifBlank { id }, "content" to text)
+        if (picId != null) form["pic_id"] = picId
+        val ok = postOk("https://m.weibo.cn/api/comments/create", form)
         App.cache.clear()
         return ok
     }
@@ -961,16 +960,15 @@ class Repo(private val context: Context, private val store: Store) {
      * comment id for the first reply, or a reply id to nest under that particular reply. The
      * created reply comes back so the thread can show it without re-reading a lagging list.
      */
-    suspend fun replyComment(id: String, mid: String, cid: String, text: String): Comment {
-        val root = postJson(
-            "https://m.weibo.cn/api/comments/reply",
-            mapOf(
-                "id" to id,
-                "mid" to mid.ifBlank { id },
-                "cid" to cid,
-                "content" to text,
-            ),
+    suspend fun replyComment(id: String, mid: String, cid: String, text: String, picId: String? = null): Comment {
+        val form = linkedMapOf(
+            "id" to id,
+            "mid" to mid.ifBlank { id },
+            "cid" to cid,
+            "content" to text,
         )
+        if (picId != null) form["pic_id"] = picId
+        val root = postJson("https://m.weibo.cn/api/comments/reply", form)
         if (root.optInt("ok", 0) != 1) throw ApiException(root.str("msg", "回复失败"))
         App.cache.clear()
         return Comment.from(root.optJSONObject("data"), depth = 1)

@@ -152,10 +152,16 @@ data class Pic(
     val height: Int = 0,
 )
 
+data class VideoQuality(
+    val label: String,
+    val url: String,
+)
+
 data class VideoInfo(
     val title: String,
     val cover: String,
     val url: String,
+    val qualities: List<VideoQuality> = emptyList(),
 )
 
 data class VoteOption(
@@ -318,16 +324,26 @@ data class Status(
             val page = o.optJSONObject("page_info")
             if (page != null && page.str("type") == "video") {
                 val media = page.optJSONObject("media_info")
-                val url = media?.str("stream_url_hd")?.ifBlank { media.str("stream_url") }
-                    ?.ifBlank { media.str("mp4_720p_mp4") }
-                    ?.ifBlank { media.str("mp4_hd_url") }
-                    ?.ifBlank { media.str("mp4_sd_url") }
-                    ?: ""
+                val qualities = buildList {
+                    val seen = mutableSetOf<String>()
+                    fun addQuality(label: String, value: String?) {
+                        val valueUrl = value.orEmpty()
+                        if (valueUrl.isNotBlank() && seen.add(valueUrl)) add(VideoQuality(label, valueUrl))
+                    }
+                    addQuality("1080P", media?.str("mp4_1080p_mp4"))
+                    addQuality("720P", media?.str("mp4_720p_mp4"))
+                    addQuality("高清", media?.str("stream_url_hd"))
+                    addQuality("标清", media?.str("mp4_sd_url"))
+                    addQuality("流畅", media?.str("stream_url"))
+                    addQuality("高清", media?.str("mp4_hd_url"))
+                }
+                val url = qualities.firstOrNull()?.url ?: ""
                 val cover = page.optJSONObject("page_pic")?.str("url") ?: ""
                 video = VideoInfo(
                     title = page.str("page_title"),
                     cover = cover.ifBlank { pics.firstOrNull()?.thumb ?: "" },
                     url = url,
+                    qualities = qualities,
                 )
             }
 

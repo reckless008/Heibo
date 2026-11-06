@@ -400,4 +400,66 @@ object CoboIcons {
             }
         }.build()
     }
+
+    val Bell: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Bell",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(12f, 2.5f)
+                curveTo(8.4f, 2.5f, 5.5f, 5.4f, 5.5f, 9f)
+                lineTo(5.5f, 14f)
+                lineTo(3.5f, 17f)
+                lineTo(20.5f, 17f)
+                lineTo(18.5f, 14f)
+                lineTo(18.5f, 9f)
+                curveTo(18.5f, 5.4f, 15.6f, 2.5f, 12f, 2.5f)
+                close()
+                moveTo(9.5f, 19f)
+                lineTo(14.5f, 19f)
+                curveTo(14.5f, 20.4f, 13.4f, 21.5f, 12f, 21.5f)
+                curveTo(10.6f, 21.5f, 9.5f, 20.4f, 9.5f, 19f)
+                close()
+            }
+        }.build()
+    }
+
+    val Broom: ImageVector by lazy {
+        ImageVector.Builder(
+            name = "Broom",
+            defaultWidth = 24.dp,
+            defaultHeight = 24.dp,
+            viewportWidth = 24f,
+            viewportHeight = 24f,
+        ).apply {
+            path(fill = SolidColor(Color.Black)) {
+                moveTo(19.6f, 2.6f)
+                lineTo(21.4f, 4.4f)
+                lineTo(11.4f, 14.4f)
+                lineTo(9.6f, 12.6f)
+                close()
+                moveTo(10.2f, 13.2f)
+                lineTo(4.2f, 19.2f)
+                lineTo(4.2f, 21.8f)
+                lineTo(6.8f, 21.8f)
+                lineTo(12.2f, 16.4f)
+                close()
+                moveTo(5.2f, 19.0f)
+                lineTo(6.2f, 20.0f)
+                lineTo(7.0f, 19.2f)
+                lineTo(6.0f, 18.2f)
+                close()
+                moveTo(7.2f, 17.0f)
+                lineTo(8.2f, 18.0f)
+                lineTo(9.0f, 17.2f)
+                lineTo(8.0f, 16.2f)
+                close()
+            }
+        }.build()
+    }
+
 }

@@ -167,11 +167,11 @@ fun StatusCard(
             }
         }
         if (repostDialog) {
-            InputDialog(
+            ComposerDialog(
                 title = "转发",
                 hint = "说点什么",
                 onDismiss = { repostDialog = false },
-                onConfirm = { text ->
+                onSend = { text, _ ->
                     repostDialog = false
                     scope.launch {
                         runCatching {
@@ -187,15 +187,17 @@ fun StatusCard(
             )
         }
         if (commentDialog) {
-            InputDialog(
+            ComposerDialog(
                 title = "评论",
                 hint = "写评论",
+                allowImage = true,
                 onDismiss = { commentDialog = false },
-                onConfirm = { text ->
+                onSend = { text, image ->
                     commentDialog = false
                     scope.launch {
                         runCatching {
-                            App.repo.comment(status.id, status.mid.ifBlank { status.id }, text)
+                            val picId = image?.let { App.repo.uploadImage(it) }
+                            App.repo.comment(status.id, status.mid.ifBlank { status.id }, text, picId)
                         }.onSuccess {
                             shown = shown.copy(comments = shown.comments + 1)
                             App.toast("评论成功")
@@ -910,6 +912,7 @@ private fun VoteFooter(
  */
 @Composable
 private fun nestedBlockTone(): Color {
-    val scheme = COUITheme.colorScheme
-    return if (scheme.background.luminance() < 0.5f) scheme.surfaceContainer else scheme.background
+    // 引用/转发块是卡片里的“凹陷”层：两种模式都用页面底色（深色 #000 落在 #1C1C1E 卡片上，
+    // 浅色 #F0F1F2 落在白卡上）；旧版深色用 surfaceContainer，和卡片同色，块直接隐形。
+    return COUITheme.colorScheme.background
 }

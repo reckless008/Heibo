@@ -1,5 +1,14 @@
 package com.cobo.app.screen
 
+import androidx.compose.foundation.verticalScroll
+
+import androidx.compose.foundation.rememberScrollState
+
+import androidx.compose.foundation.layout.heightIn
+
+import com.cobo.app.data.VideoInfo
+import com.cobo.app.data.VideoQuality
+
 import android.Manifest
 import android.app.Activity
 import android.content.ContentValues
@@ -55,6 +64,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -116,6 +126,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.pm.ActivityInfo
 import androidx.compose.ui.util.fastAny
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.lerp
@@ -161,6 +172,8 @@ import io.github.suqi8.coui.kmp.blur.LocalBackdrop
 import io.github.suqi8.coui.kmp.blur.layerBackdrop
 import io.github.suqi8.coui.kmp.blur.rememberLayerBackdrop
 import io.github.suqi8.coui.kmp.icon.extended.Close
+import io.github.suqi8.coui.kmp.icon.extended.Refresh
+import io.github.suqi8.coui.kmp.icon.extended.More
 import io.github.suqi8.coui.kmp.icon.extended.Download
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -1032,7 +1045,15 @@ private fun Context.findActivity(): Activity? {
 }
 
 @Composable
-fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = "") {
+fun VideoScreen(nav: NavState, video: VideoInfo, statusId: String = "") {
+    val url = video.url
+    val title = video.title
+    val qualities = remember(video) {
+        video.qualities.ifEmpty { listOf(VideoQuality("默认", video.url)) }
+    }
+    var quality by remember(video) { mutableStateOf(qualities.first()) }
+    var qualityMenu by remember { mutableStateOf(false) }
+    var landscape by remember { mutableStateOf(false) }
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val audio = remember(context) {
@@ -1083,12 +1104,57 @@ fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = ""
             }
     }
 
+    fun selectQuality(target: VideoQuality) {
+        if (target.url != quality.url) {
+            val resumeAt = player.currentPosition
+            player.setMediaItem(MediaItem.fromUri(target.url), resumeAt)
+            player.prepare()
+            player.playWhenReady = true
+        }
+        quality = target
+        qualityMenu = false
+    }
+
+    fun toggleLandscape() {
+        landscape = !landscape
+        activity?.requestedOrientation = if (landscape) {
+            ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
+    }
+
+    LaunchedEffect(landscape) {
+        val window = activity?.window ?: return@LaunchedEffect
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        if (landscape) {
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        } else {
+            controller.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            val window = activity?.window
+            if (window != null) {
+                WindowCompat.getInsetsController(window, window.decorView)
+                    .show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+    }
+
     var speed by remember { mutableFloatStateOf(1f) }
     var speedMenu by remember { mutableStateOf(false) }
     var hud by remember { mutableStateOf("") }
     var hudTick by remember { mutableIntStateOf(0) }
     var controlsVisible by remember { mutableStateOf(true) }
     var isPlaying by remember { mutableStateOf(true) }
+    var ended by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var seekFraction by remember { mutableStateOf<Float?>(null) }
@@ -1130,6 +1196,10 @@ fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = ""
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+            override fun onPlaybackStateChanged(state: Int) {
+                ended = state == Player.STATE_ENDED
+                if (ended) controlsVisible = true
+            }
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
@@ -1283,92 +1353,109 @@ fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = ""
                 .statusBarsPadding()
                 .padding(8.dp),
             verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             VideoGlassButton(40.dp, { nav.pop() }) {
                 Icon(COUIIcons.Close, "关闭", Modifier.size(22.dp), tint = scheme.onSurface)
             }
-            Text(title, color = Color.White, fontSize = 14.sp, maxLines = 1)
+            Text(
+                title,
+                color = Color.White,
+                fontSize = 14.sp,
+                maxLines = 1,
+                modifier = Modifier.widthIn(max = 200.dp),
+            )
         }
-
-        Column(
-            modifier = Modifier
+        Box(
+            Modifier
                 .align(Alignment.TopEnd)
                 .statusBarsPadding()
-                .padding(8.dp),
-            horizontalAlignment = Alignment.End,
+                .padding(8.dp)
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(SpeedPanel)
+                .clickable { moreMenu = !moreMenu },
+            contentAlignment = Alignment.Center,
         ) {
-            // Black-on-black is invisible when the video is dark, so both the button and the
-            // menu use a solid ink panel instead of a translucent black.
-            Box(
-                modifier = Modifier
-                    .height(36.dp)
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(SpeedPanel)
-                    .clickable { speedMenu = !speedMenu }
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.Center,
+            Icon(COUIIcons.More, "更多", Modifier.size(22.dp), tint = Color.White)
+        }
+        if (moreMenu) {
+            Column(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(top = 56.dp, end = 8.dp)
+                    .width(200.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(COUITheme.colorScheme.surfaceContainer)
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState())
+                    .padding(vertical = 6.dp),
             ) {
-                Text(text = speedLabel(speed), color = Color.White, fontSize = 13.sp)
-            }
-            if (speedMenu) {
-                Spacer(Modifier.height(6.dp))
-                Column(
-                    modifier = Modifier
-                        .width(108.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(SpeedPanel)
-                        .padding(vertical = 4.dp),
-                ) {
-                    Speeds.forEach { value ->
-                        val selected = speed == value
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable {
-                                    speed = value
-                                    player.setPlaybackSpeed(value)
-                                    speedMenu = false
-                                    flash("${speedLabel(value)} 倍速")
-                                }
-                                .padding(vertical = 9.dp),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Text(
-                                text = speedLabel(value),
-                                color = if (selected) scheme.primary else Color.White,
-                                fontSize = 14.sp,
-                            )
-                        }
+                MenuSection("倍速")
+                Speeds.forEach { value ->
+                    MenuRow(speedLabel(value), speed == value) {
+                        speed = value
+                        player.setPlaybackSpeed(value)
+                        moreMenu = false
+                        flash("${speedLabel(value)} 倍速")
+                    }
+                }
+                MenuSection("清晰度")
+                qualities.forEach { q ->
+                    MenuRow(q.label, q.url == quality.url) {
+                        selectQuality(q)
+                        moreMenu = false
                     }
                 }
             }
         }
 
 
-        Row(
+
+
+        Column(
             modifier = Modifier.align(Alignment.Center),
-            horizontalArrangement = Arrangement.spacedBy(22.dp),
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            VideoGlassButton(40.dp, {
-                player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
-            }) {
-                VideoIcon(androidx.media3.ui.R.drawable.exo_icon_rewind, "后退 10 秒", 22.dp)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(22.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (ended) {
+                    VideoGlassButton(64.dp, {
+                        player.seekTo(0L)
+                        player.play()
+                        ended = false
+                    }) {
+                        Icon(COUIIcons.Refresh, "重新播放", Modifier.size(30.dp), tint = scheme.onSurface)
+                    }
+                } else {
+                    VideoGlassButton(40.dp, {
+                        player.seekTo((player.currentPosition - 10_000L).coerceAtLeast(0L))
+                    }) {
+                        VideoIcon(androidx.media3.ui.R.drawable.exo_icon_rewind, "后退 10 秒", 22.dp)
+                    }
+                    VideoGlassButton(60.dp, {
+                        if (isPlaying) player.pause() else player.play()
+                    }) {
+                        VideoIcon(
+                            if (isPlaying) androidx.media3.ui.R.drawable.exo_icon_pause
+                            else androidx.media3.ui.R.drawable.exo_icon_play,
+                            if (isPlaying) "暂停" else "播放",
+                            26.dp,
+                        )
+                    }
+                    VideoGlassButton(40.dp, {
+                        player.seekTo(player.currentPosition + 10_000L)
+                    }) {
+                        VideoIcon(androidx.media3.ui.R.drawable.exo_icon_fastforward, "前进 10 秒", 22.dp)
+                    }
+                }
             }
-            VideoGlassButton(60.dp, {
-                if (isPlaying) player.pause() else player.play()
-            }) {
-                VideoIcon(
-                    if (isPlaying) androidx.media3.ui.R.drawable.exo_icon_pause
-                    else androidx.media3.ui.R.drawable.exo_icon_play,
-                    if (isPlaying) "暂停" else "播放",
-                    26.dp,
-                )
-            }
-            VideoGlassButton(40.dp, {
-                player.seekTo(player.currentPosition + 10_000L)
-            }) {
-                VideoIcon(androidx.media3.ui.R.drawable.exo_icon_fastforward, "前进 10 秒", 22.dp)
+            if (ended) {
+                Spacer(Modifier.height(10.dp))
+                Text("重新播放", color = Color.White, fontSize = 13.sp)
             }
         }
 
@@ -1442,7 +1529,10 @@ fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = ""
                     )
                 }
             }
-            Row(Modifier.fillMaxWidth()) {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 Text(
                     videoTime(seekFraction?.let { (it * duration).toLong() } ?: position),
                     color = Color.White.copy(alpha = 0.8f),
@@ -1454,8 +1544,23 @@ fun VideoScreen(nav: NavState, url: String, title: String, statusId: String = ""
                     color = Color.White.copy(alpha = 0.8f),
                     fontSize = 11.sp,
                 )
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .clickable { toggleLandscape() },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    VideoIcon(
+                        if (landscape) androidx.media3.ui.R.drawable.exo_icon_fullscreen_exit
+                        else androidx.media3.ui.R.drawable.exo_icon_fullscreen_enter,
+                        if (landscape) "退出全屏" else "全屏",
+                        20.dp,
+                    )
+                }
             }
         }
+
         }
 
         if (hud.isNotEmpty()) {
@@ -1499,4 +1604,37 @@ private fun VideoIcon(resId: Int, description: String, size: Dp) {
 private fun videoTime(ms: Long): String {
     val total = (ms / 1000).coerceAtLeast(0)
     return "%02d:%02d".format(total / 60, total % 60)
+}
+
+@Composable
+private fun MenuSection(title: String) {
+    Text(
+        title,
+        color = Color.White.copy(alpha = 0.45f),
+        fontSize = 11.sp,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 14.dp, top = 10.dp, bottom = 4.dp),
+    )
+}
+
+@Composable
+private fun MenuRow(label: String, selected: Boolean, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            label,
+            color = if (selected) COUITheme.colorScheme.primary else Color.White,
+            fontSize = 14.sp,
+            modifier = Modifier.weight(1f),
+        )
+        if (selected) {
+            Text("✓", color = COUITheme.colorScheme.primary, fontSize = 14.sp)
+        }
+    }
 }

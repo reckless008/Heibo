@@ -2,12 +2,8 @@ package com.cobo.app.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
-import io.github.suqi8.coui.kmp.basic.AppBarBlurOverlayDefaults
+import io.github.suqi8.coui.kmp.theme.COUITheme
 
-/**
- * The page surface the system apps paint behind their cards: the theme's surface in the light
- * theme, `#303030` in the dark theme. COUI's dark `background` is `#1E1E1E`, which reads a full
- * step darker than the platform pages and leaves every card floating on a darker sheet.
- */
+/** 页面底色：浅色 #F0F1F2，深色 #000000（Apple HIG 基底黑）。 */
 @Composable
-fun pageContainerColor(): Color = AppBarBlurOverlayDefaults.containerColor()
+fun pageContainerColor(): Color = COUITheme.colorScheme.background

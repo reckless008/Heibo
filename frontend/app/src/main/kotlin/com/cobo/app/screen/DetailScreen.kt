@@ -92,7 +92,7 @@ import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.Avatar
 import com.cobo.app.ui.components.BackIconButton
 import com.cobo.app.ui.components.ErrorState
-import com.cobo.app.ui.components.InputDialog
+import com.cobo.app.ui.components.ComposerDialog
 import com.cobo.app.ui.components.LoadingState
 import com.cobo.app.ui.components.MemberBadge
 import com.cobo.app.ui.components.ScrollEdgeFade
@@ -305,7 +305,7 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
                             onOpen = {},
                             onUser = { nav.push(Route.Profile(it.id)) },
                             onImage = { urls, i -> nav.push(Route.Images(urls, i)) },
-                            onVideo = { nav.push(Route.Video(it.url, it.title, status?.id.orEmpty())) },
+                            onVideo = { nav.push(Route.Video(it, status?.id.orEmpty())) },
                             onLike = {
                                 val s = status ?: return@StatusCard
                                 scope.launch {
@@ -561,11 +561,11 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
     }
 
     if (repostDialog) {
-        InputDialog(
+        ComposerDialog(
             title = "转发",
             hint = "说点什么",
             onDismiss = { repostDialog = false },
-            onConfirm = { text ->
+            onSend = { text, _ ->
                 repostDialog = false
                 scope.launch {
                     runCatching { App.repo.repost(id, effectiveMid(), text) }
@@ -576,14 +576,18 @@ fun DetailScreen(nav: NavState, id: String, mid: String, readOnly: Boolean = fal
         )
     }
     if (commentDialog) {
-        InputDialog(
+        ComposerDialog(
             title = "评论",
             hint = "写评论",
+            allowImage = true,
             onDismiss = { commentDialog = false },
-            onConfirm = { text ->
+            onSend = { text, image ->
                 commentDialog = false
                 scope.launch {
-                    runCatching { App.repo.comment(id, effectiveMid(), text) }.onSuccess {
+                    runCatching {
+                        val picId = image?.let { App.repo.uploadImage(it) }
+                        App.repo.comment(id, effectiveMid(), text, picId)
+                    }.onSuccess {
                         App.toast("评论成功")
                         loadComments(true, force = true)
                     }.onFailure { App.toast(it.message ?: "评论失败") }
@@ -866,14 +870,18 @@ private fun CommentCard(
     }
 
     replyTarget?.let { target ->
-        InputDialog(
+        ComposerDialog(
             title = "回复 @${target.user?.name.orEmpty()}",
             hint = "回复",
+            allowImage = true,
             onDismiss = { replyTarget = null },
-            onConfirm = { text ->
+            onSend = { text, image ->
                 replyTarget = null
                 scope.launch {
-                    runCatching { App.repo.replyComment(statusId, mid, target.id, text) }
+                    runCatching {
+                        val picId = image?.let { App.repo.uploadImage(it) }
+                        App.repo.replyComment(statusId, mid, target.id, text, picId)
+                    }
                         .onSuccess {
                             App.toast("回复成功")
                             showNewReply(it)

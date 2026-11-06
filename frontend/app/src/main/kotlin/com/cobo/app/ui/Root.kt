@@ -81,6 +81,7 @@ import com.cobo.app.screen.VideoScreen
 import com.cobo.app.screen.VoteScreen
 import com.cobo.app.screen.WebScreen
 import com.cobo.app.ui.components.ImageSaver
+import com.cobo.app.ui.components.LocalNavMotion
 import com.cobo.app.ui.components.LocalImageSaver
 import com.cobo.app.ui.components.SaveHud
 import com.cobo.app.ui.components.SaveImagesMenu
@@ -201,6 +202,7 @@ fun CoboRoot() {
         LocalLinkHandler provides linkHandler,
         LocalImageSaver provides imageSaver,
         LocalImageOrigins provides imageOrigins,
+        LocalNavMotion provides nav.animating,
     ) {
         BoxWithConstraints(
             Modifier
@@ -642,7 +644,7 @@ private fun RouteContent(route: Route, nav: NavState) {
         Route.Nearby -> NearbyScreen(nav)
         is Route.Topic -> TopicScreen(nav, route.name)
         is Route.Images -> ImageViewerScreen(nav, route.urls, route.index)
-        is Route.Video -> VideoScreen(nav, route.url, route.title, route.statusId)
+        is Route.Video -> VideoScreen(nav, route.video, route.statusId)
         is Route.Vote -> VoteScreen(nav, route.voteId)
     }
 }

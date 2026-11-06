@@ -1,5 +1,7 @@
 package com.cobo.app.ui
 
+import com.cobo.app.data.VideoInfo
+
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearEasing
@@ -9,6 +11,7 @@ import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -42,7 +45,7 @@ import kotlinx.coroutines.launch
  * 动量不靠「换一条低阻尼弹簧」表达：手势松手只把手指速度交给进度动画的初速度（§5 速度交接），
  * 弹簧本身始终 damping 1.0。这样按钮返回和侧滑松手是同一个收尾，不会出现手势回弹、按钮不回弹的分叉。
  */
-val HigTransition = spring<Float>(dampingRatio = 1.0f, stiffness = 380f)
+val HigTransition = spring<Float>(dampingRatio = 1.0f, stiffness = 320f)
 const val RouteParallaxDivisor = 4f
 
 /**
@@ -145,7 +148,7 @@ sealed interface Route {
     data object Nearby : Route
     data class Topic(val name: String = "") : Route
     data class Images(val urls: List<String>, val index: Int) : Route
-    data class Video(val url: String, val title: String, val statusId: String = "") : Route
+    data class Video(val video: VideoInfo, val statusId: String = "") : Route
     data class Vote(val voteId: String) : Route
 }
 
@@ -182,6 +185,16 @@ class NavState {
     val stack = mutableStateListOf<NavEntry>(
         NavEntry(if (App.repo.hasSession() || App.settings.localMode) Route.Main else Route.Login())
     )
+
+    /**
+     * 转场进行中（含预测性返回预览）。玻璃在这段时间里退回纯着色，避免每帧重新采样
+     * 正在移动的背景、重跑模糊与 AGSL 折射——这是进出场掉帧的主要来源。
+     */
+    val animating: Boolean by derivedStateOf {
+        stack.any {
+            it.exiting || it.previewing || it.progress.value < 0.999f || it.fade.value < 0.999f
+        }
+    }
 
     private var host: CoroutineScope? = null
 

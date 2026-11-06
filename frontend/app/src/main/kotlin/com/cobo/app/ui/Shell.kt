@@ -85,7 +85,10 @@ import com.cobo.app.screen.TimelineScreen
 import com.cobo.app.ui.components.GlassIconButton
 import com.cobo.app.ui.components.GlassPillButton
 import com.cobo.app.ui.components.ScrollEdgeFade
+import com.cobo.app.ui.components.ConfirmDialog
+import com.cobo.app.ui.CoboIcons
 import com.cobo.app.ui.components.glassEdgeLight
+import com.cobo.app.ui.components.glassLensFill
 import com.cobo.app.ui.components.glassPlate
 import com.cobo.app.ui.components.glassPlateAlpha
 import com.cobo.app.ui.components.liquidGlass
@@ -533,18 +536,39 @@ private fun BarContent(
             onPublish = onPublish,
         )
 
-        1 -> PageTitleBar(
-            title = "消息",
-            actions = {
-                if (!guest) {
-                    GlassPillButton(
-                        text = "通知",
-                        onClick = { nav.push(Route.Web("https://m.weibo.cn/message/", "通知")) },
-                        modifier = Modifier.testTag("top_notice"),
-                    )
-                }
-            },
-        )
+        1 -> {
+            var showClear by remember { mutableStateOf(false) }
+            PageTitleBar(
+                title = "消息",
+                actions = {
+                    if (!guest) {
+                        GlassIconButton(
+                            onClick = { showClear = true },
+                            modifier = Modifier.testTag("top_clear"),
+                        ) {
+                            Icon(CoboIcons.Broom, "清除所有通知", Modifier.size(20.dp))
+                        }
+                        GlassPillButton(
+                            text = "通知",
+                            onClick = { nav.push(Route.Web("https://m.weibo.cn/message/", "通知")) },
+                            modifier = Modifier.testTag("top_notice"),
+                        )
+                    }
+                },
+            )
+            if (showClear) {
+                ConfirmDialog(
+                    title = "清除所有通知",
+                    message = "会清除所有会话的未读标记，不影响聊天记录。",
+                    confirmText = "清除",
+                    onDismiss = { showClear = false },
+                    onConfirm = {
+                        showClear = false
+                        App.messagesClearEvents.tryEmit(Unit)
+                    },
+                )
+            }
+        }
 
         else -> PageTitleBar(
             title = "我",
@@ -820,8 +844,8 @@ private fun FeedTabs(
                 .size(width = drawW, height = drawH)
                 .clip(CouiSegmentCapsuleShape)
                 // 与底栏同一套玻璃透镜：亮一档的半透玻璃 + 受光边，而非白色实心块。
-                .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
-                .glassEdgeLight(dark)
+                .background(glassLensFill(dark))
+                .glassEdgeLight(dark, lens = true)
                 .shadow(
                     elevation = 3.dp,
                     // 阴影也跟着用连续曲率胶囊，否则圆形胶囊的影子会在端头探出来。
@@ -1027,7 +1051,7 @@ private fun FloatingBottomBar(
                         RoundedCornerShape(GlassBarRadius),
                         glassPlate(dark),
                         glassPlateAlpha(dark),
-                        blurRadius = 52f,
+                        blurRadius = 16f,
                     )
                     .fillMaxWidth()
                     .height(GlassBarHeight)
@@ -1050,8 +1074,8 @@ private fun FloatingBottomBar(
                         .clip(RoundedCornerShape(23.dp))
                         // 玻璃透镜：同为玻璃材质、但比容器亮一档——层级来自材质厚度（Apple §12），
                         // 不是白色实心块；配合受光边与投影，读作「浮在玻璃里的一枚镜片」。
-                        .background(if (dark) Color(0x33FFFFFF) else Color(0xA6FFFFFF))
-                        .glassEdgeLight(dark)
+                        .background(glassLensFill(dark))
+                        .glassEdgeLight(dark, lens = true)
                         .shadow(
                             elevation = 3.dp,
                             shape = RoundedCornerShape(23.dp),

@@ -38,6 +38,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.cobo.app.App
+import com.cobo.app.ui.components.WeiboWebView
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.saveable.rememberSaveable
 import com.cobo.app.data.MessageItem
 import com.cobo.app.data.chatPlainText
 import com.cobo.app.data.formatWeiboTime
@@ -59,7 +65,7 @@ import io.github.suqi8.coui.kmp.theme.COUITheme
 import kotlinx.coroutines.launch
 
 @Composable
-fun MessagesScreen(nav: NavState, topInset: Dp) {
+private fun DirectMessagesScreen(nav: NavState, topInset: Dp) {
     val scope = rememberCoroutineScope()
     val items = remember { mutableStateListOf<MessageItem>() }
     var page by remember { mutableIntStateOf(1) }
@@ -221,7 +227,7 @@ private fun MessageRow(
                 }
                 Spacer(Modifier.height(3.dp))
                 Text(
-                    chatPlainText(item.text),
+                    chatPlainText(item.text).ifBlank { "[表情]" },
                     fontSize = 13.sp,
                     color = scheme.onSurfaceSecondary,
                     maxLines = 2,
@@ -246,6 +252,56 @@ private fun MessageRow(
                     .height(0.5.dp)
                     .background(scheme.onSurface.copy(alpha = 0.07f)),
             )
+        }
+    }
+}
+
+@Composable
+fun MessagesScreen(nav: NavState, topInset: Dp) {
+    var section by rememberSaveable { mutableIntStateOf(0) }
+    Column(Modifier.fillMaxSize()) {
+        MessageTabBar(section, topInset) { section = it }
+        if (section == 0) {
+            DirectMessagesScreen(nav, 0.dp)
+        } else {
+            WeiboWebView(
+                url = "https://m.weibo.cn/message/",
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+    }
+}
+
+private val MessageSections = listOf("私信", "评论", "@", "赞", "订阅消息", "未关注人")
+
+@Composable
+private fun MessageTabBar(selected: Int, topInset: Dp, onSelect: (Int) -> Unit) {
+    val scheme = COUITheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = topInset)
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        MessageSections.forEachIndexed { index, title ->
+            val active = index == selected
+            Box(
+                Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (active) scheme.surfaceContainerHigh else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(horizontal = 14.dp, vertical = 7.dp),
+            ) {
+                Text(
+                    title,
+                    fontSize = 14.sp,
+                    fontWeight = if (active) FontWeight.Medium else FontWeight.Normal,
+                    color = if (active) scheme.onSurface else scheme.onSurfaceSecondary,
+                    maxLines = 1,
+                )
+            }
         }
     }
 }
