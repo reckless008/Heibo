@@ -35,6 +35,8 @@ fun WeiboWebView(
             CookieManager.getInstance().flush()
         }
         WebView(context).apply {
+            setLayerType(WebView.LAYER_TYPE_HARDWARE, null)
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
             settings.useWideViewPort = true

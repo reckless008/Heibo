@@ -44,6 +44,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.graphics.Color
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.cobo.app.ui.CoboIcons
+import io.github.suqi8.coui.kmp.basic.Icon
+import io.github.suqi8.coui.kmp.icon.COUIIcons
+import io.github.suqi8.coui.kmp.icon.extended.ChevronForward
 import com.cobo.app.data.MessageItem
 import com.cobo.app.data.chatPlainText
 import com.cobo.app.data.formatWeiboTime
@@ -136,6 +141,16 @@ private fun DirectMessagesScreen(nav: NavState, topInset: Dp) {
                 bottom = 78.dp + navBottomPadding(),
             ),
         ) {
+            item {
+                NotificationGroup(
+                    onComments = { nav.push(Route.Web("https://m.weibo.cn/message/", "评论")) },
+                    onMentions = { nav.push(Route.Web("https://m.weibo.cn/message/", "提到我的")) },
+                    onLikes = { nav.push(Route.Web("https://m.weibo.cn/message/", "赞")) },
+                    onSubscribe = { nav.push(Route.Web("https://m.weibo.cn/message/", "订阅消息")) },
+                    onStrangers = { nav.push(Route.Web("https://m.weibo.cn/message/", "未关注人消息")) },
+                )
+            }
+            item { Spacer(Modifier.height(10.dp)) }
             if (items.isEmpty()) {
                 item {
                     when {
@@ -258,18 +273,7 @@ private fun MessageRow(
 
 @Composable
 fun MessagesScreen(nav: NavState, topInset: Dp) {
-    var section by rememberSaveable { mutableIntStateOf(0) }
-    Column(Modifier.fillMaxSize()) {
-        MessageTabBar(section, topInset) { section = it }
-        if (section == 0) {
-            DirectMessagesScreen(nav, 0.dp)
-        } else {
-            WeiboWebView(
-                url = "https://m.weibo.cn/message/",
-                modifier = Modifier.fillMaxSize(),
-            )
-        }
-    }
+    DirectMessagesScreen(nav, topInset)
 }
 
 private val MessageSections = listOf("私信", "评论", "@", "赞", "订阅消息", "未关注人")
@@ -304,4 +308,77 @@ private fun MessageTabBar(selected: Int, topInset: Dp, onSelect: (Int) -> Unit) 
             }
         }
     }
+}
+
+@Composable
+private fun NotificationGroup(
+    onComments: () -> Unit,
+    onMentions: () -> Unit,
+    onLikes: () -> Unit,
+    onSubscribe: () -> Unit,
+    onStrangers: () -> Unit,
+) {
+    val scheme = COUITheme.colorScheme
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 12.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .background(scheme.surfaceContainer),
+    ) {
+        NotificationRow(CoboIcons.Comment, "评论", "查看收到的评论", onComments)
+        NotificationDivider()
+        NotificationRow(CoboIcons.At, "提到我的", "查看 @ 我的提醒", onMentions)
+        NotificationDivider()
+        NotificationRow(CoboIcons.Heart, "赞", "查看收到的赞", onLikes)
+        NotificationDivider()
+        NotificationRow(CoboIcons.Bell, "订阅消息", "查看订阅消息", onSubscribe)
+        NotificationDivider()
+        NotificationRow(CoboIcons.Comment, "未关注人消息", "查看未关注人消息", onStrangers)
+    }
+}
+
+@Composable
+private fun NotificationRow(
+    icon: ImageVector,
+    title: String,
+    summary: String,
+    onClick: () -> Unit,
+) {
+    val scheme = COUITheme.colorScheme
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            Modifier
+                .size(46.dp)
+                .clip(CircleShape)
+                .background(scheme.surfaceContainerHigh),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(icon, title, Modifier.size(22.dp), tint = scheme.onSurface)
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            Spacer(Modifier.height(3.dp))
+            Text(summary, fontSize = 13.sp, color = scheme.onSurfaceSecondary)
+        }
+        Icon(COUIIcons.ChevronForward, "进入", Modifier.size(18.dp), tint = scheme.onSurfaceSecondary)
+    }
+}
+
+@Composable
+private fun NotificationDivider() {
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 72.dp)
+            .height(0.5.dp)
+            .background(COUITheme.colorScheme.onSurface.copy(alpha = 0.07f)),
+    )
 }
